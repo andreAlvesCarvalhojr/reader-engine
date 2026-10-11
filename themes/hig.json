@@ -1,0 +1,12 @@
+{
+  "design_system": "hig",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F2F2F7",
+    "on_surface": "#000000",
+    "primary": "#007AFF",
+    "on_primary": "#FFFFFF"
+  },
+  "typography": { "font_family": "-apple-system, 'SF Pro Text', sans-serif", "base_size_px": 17, "line_height": 1.47 },
+  "shape": { "corner_radius_px": 10, "spacing_unit_px": 8 }
+}

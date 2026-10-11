@@ -1,0 +1,9 @@
+[package]
+name = "reader-epub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+reader-core = { workspace = true, features = ["zip"] }
+roxmltree.workspace = true
