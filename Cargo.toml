@@ -5,6 +5,7 @@ members = [
     "crates/reader-epub",
     "crates/reader-hpub",
     "crates/reader-json",
+    "crates/reader-demo",
 ]
 
 [workspace.package]
@@ -19,3 +20,6 @@ thiserror = "1"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 roxmltree = "0.20"
 reader-core = { path = "crates/reader-core" }
+reader-epub = { path = "crates/reader-epub" }
+reader-hpub = { path = "crates/reader-hpub" }
+reader-json = { path = "crates/reader-json" }

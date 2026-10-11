@@ -59,3 +59,30 @@ impl ThemeTokens {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_json_and_content_css() {
+        let json = r##"{
+          "design_system": "material3",
+          "colors": {
+            "background": "#fff",
+            "surface": "#fff",
+            "on_surface": "#111",
+            "primary": "#06c",
+            "on_primary": "#fff"
+          },
+          "typography": { "font_family": "Georgia", "base_size_px": 18, "line_height": 1.6 },
+          "shape": { "corner_radius_px": 8, "spacing_unit_px": 8 }
+        }"##;
+        let t = ThemeTokens::from_json(json).unwrap();
+        assert_eq!(t.design_system, DesignSystem::Material3);
+        let css = t.to_content_css(2.0);
+        assert!(css.contains("font-size:36px"));
+        assert!(css.contains("Georgia"));
+        assert!(css.contains("#06c"));
+    }
+}
