@@ -16,10 +16,11 @@ webView.loadDataWithBaseURL(null, session.currentHtml(), "text/html", "utf-8", n
 
 ## Pré-requisitos
 
-- Android Studio Ladybug+ (JDK 17)
+- Android Studio com AGP 9+ (JDK 17+; Gradle 9.1 roda em JVM até 25)
 - Rust (`rustup`)
 - Android NDK (via SDK Manager)
 - `ANDROID_NDK_HOME` ou `ANDROID_HOME` com NDK instalado
+- SDK Platform 36 + Build-Tools 36.0.0 (Android Studio → SDK Manager)
 
 ## Build da lib nativa
 
