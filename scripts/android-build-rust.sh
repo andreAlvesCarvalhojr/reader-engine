@@ -21,9 +21,16 @@ fi
 export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${NDK_HOME:-}}"
 
 if [[ -z "${ANDROID_NDK_HOME}" || ! -d "${ANDROID_NDK_HOME}" ]]; then
-  echo "Defina ANDROID_NDK_HOME apontando para o NDK." >&2
+  echo "NDK não encontrado." >&2
+  echo "Instale via Android Studio → SDK Manager → NDK, depois:" >&2
+  echo "  export ANDROID_HOME=\"\$HOME/Library/Android/sdk\"   # Mac" >&2
+  echo "  ls \"\$ANDROID_HOME/ndk\"                             # veja a pasta da versão" >&2
+  echo "  export ANDROID_NDK_HOME=\"\$ANDROID_HOME/ndk/27.0.12077973\"" >&2
+  echo "Ou só exporte ANDROID_HOME; este script usa o NDK mais recente automaticamente." >&2
   exit 1
 fi
+
+echo "==> ANDROID_NDK_HOME=${ANDROID_NDK_HOME}"
 
 API_LEVEL="${ANDROID_API_LEVEL:-24}"
 HOST_TAG="$(uname -s | tr '[:upper:]' '[:lower:]')-x86_64"

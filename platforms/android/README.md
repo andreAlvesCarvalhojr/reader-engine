@@ -23,12 +23,23 @@ webView.loadDataWithBaseURL(null, session.currentHtml(), "text/html", "utf-8", n
 
 ## Build da lib nativa
 
-Na raiz do monorepo:
+Na **raiz do monorepo** (não dentro de `platforms/android`):
 
 ```bash
-export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<versão>
+# Se ANDROID_HOME já aponta para o SDK, o script acha o NDK sozinho:
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # caminho típico no Mac
 ./scripts/android-build-rust.sh
 ```
+
+Para forçar uma versão específica do NDK (substitua pelo número real de `ls $ANDROID_HOME/ndk`):
+
+```bash
+ls "$ANDROID_HOME/ndk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
+./scripts/android-build-rust.sh
+```
+
+Não use literais como `<versão>` no terminal — o zsh interpreta `<` e dá `parse error`.
 
 Isso gera:
 
