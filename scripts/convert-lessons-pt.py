@@ -50,9 +50,60 @@ def convert(lessons: list) -> dict:
     }
 
 
+def resolve_input(path: Path) -> Path:
+    """Aceita um .json ou uma pasta contendo um .json."""
+    path = path.expanduser().resolve()
+    if path.is_file():
+        return path
+    if path.is_dir():
+        preferred = [
+            path / "lessons-pt.json",
+            path / "lessons-pt.raw.json",
+            path / "lesson-json.json",
+        ]
+        for candidate in preferred:
+            if candidate.is_file():
+                print(f"Usando arquivo na pasta: {candidate}")
+                return candidate
+        jsons = sorted(path.glob("*.json"))
+        if len(jsons) == 1:
+            print(f"Usando unico JSON na pasta: {jsons[0]}")
+            return jsons[0]
+        if jsons:
+            listing = "\n".join(f"  - {j}" for j in jsons)
+            raise SystemExit(
+                f"{path} e uma pasta com varios JSON. Passe o arquivo:\n{listing}\n"
+                f"Ex.: python3 scripts/convert-lessons-pt.py \"{jsons[0]}\""
+            )
+        raise SystemExit(
+            f"{path} e uma pasta sem arquivos .json.\n"
+            f"Liste o conteudo: ls -la \"{path}\"\n"
+            "Depois passe o arquivo .json, nao a pasta."
+        )
+    raise SystemExit(
+        f"Nao encontrado: {path}\n"
+        "Passe o caminho do arquivo .json (ou da pasta que o contem).\n"
+        "Dica: no Finder, arraste o arquivo .json para o Terminal.\n"
+        "Ex.: python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json/lessons-pt.json"
+    )
+
+
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("input", type=Path, help="JSON bruto (array de lições)")
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Exemplos:\n"
+            "  python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json/lessons-pt.json\n"
+            "  python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json\n"
+            "  ./scripts/install-local-sample.sh"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "input",
+        type=Path,
+        help="Arquivo .json bruto OU pasta que contenha o .json",
+    )
     p.add_argument(
         "-o",
         "--output",
@@ -61,17 +112,20 @@ def main() -> None:
         help="Saída reader-json (default: fixtures/local/lessons-pt.json)",
     )
     args = p.parse_args()
-    data = json.loads(args.input.read_text(encoding="utf-8"))
+    src = resolve_input(args.input)
+    data = json.loads(src.read_text(encoding="utf-8"))
     if not isinstance(data, list):
-        raise SystemExit("Entrada deve ser um array JSON de lições")
+        raise SystemExit(
+            f"Entrada deve ser um array JSON de lições (arquivo: {src})"
+        )
     doc = convert(data)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     raw = args.output.with_name(args.output.stem + ".raw.json")
-    if raw.resolve() != args.input.resolve():
-        raw.write_bytes(args.input.read_bytes())
+    if raw.resolve() != src.resolve():
+        raw.write_bytes(src.read_bytes())
     print(f"OK: {args.output} ({len(doc['pages'])} páginas)")
 
 
