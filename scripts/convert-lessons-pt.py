@@ -51,8 +51,20 @@ def convert(lessons: list) -> dict:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("input", type=Path, help="JSON bruto (array de lições)")
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Exemplo (use o caminho REAL do arquivo no seu Mac, nao um placeholder):\n"
+            "  python3 scripts/convert-lessons-pt.py ~/Downloads/lessons-pt.json\n"
+            "  ./scripts/install-local-sample.sh"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "input",
+        type=Path,
+        help="Caminho real do JSON bruto (ex.: ~/Downloads/lessons-pt.json)",
+    )
     p.add_argument(
         "-o",
         "--output",
@@ -61,7 +73,15 @@ def main() -> None:
         help="Saída reader-json (default: fixtures/local/lessons-pt.json)",
     )
     args = p.parse_args()
-    data = json.loads(args.input.read_text(encoding="utf-8"))
+    src = args.input.expanduser().resolve()
+    if not src.is_file():
+        raise SystemExit(
+            f"Arquivo nao encontrado: {src}\n"
+            "Passe o caminho real do lessons-pt.json (nao use /caminho/para/...).\n"
+            "Dica: arraste o arquivo do Finder para o Terminal para colar o path.\n"
+            "Ex.: python3 scripts/convert-lessons-pt.py ~/Downloads/lessons-pt.json"
+        )
+    data = json.loads(src.read_text(encoding="utf-8"))
     if not isinstance(data, list):
         raise SystemExit("Entrada deve ser um array JSON de lições")
     doc = convert(data)
@@ -70,8 +90,8 @@ def main() -> None:
         json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     raw = args.output.with_name(args.output.stem + ".raw.json")
-    if raw.resolve() != args.input.resolve():
-        raw.write_bytes(args.input.read_bytes())
+    if raw.resolve() != src.resolve():
+        raw.write_bytes(src.read_bytes())
     print(f"OK: {args.output} ({len(doc['pages'])} páginas)")
 
 
