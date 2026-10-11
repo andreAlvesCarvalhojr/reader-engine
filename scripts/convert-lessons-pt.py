@@ -50,12 +50,51 @@ def convert(lessons: list) -> dict:
     }
 
 
+def resolve_input(path: Path) -> Path:
+    """Aceita um .json ou uma pasta contendo um .json."""
+    path = path.expanduser().resolve()
+    if path.is_file():
+        return path
+    if path.is_dir():
+        preferred = [
+            path / "lessons-pt.json",
+            path / "lessons-pt.raw.json",
+            path / "lesson-json.json",
+        ]
+        for candidate in preferred:
+            if candidate.is_file():
+                print(f"Usando arquivo na pasta: {candidate}")
+                return candidate
+        jsons = sorted(path.glob("*.json"))
+        if len(jsons) == 1:
+            print(f"Usando unico JSON na pasta: {jsons[0]}")
+            return jsons[0]
+        if jsons:
+            listing = "\n".join(f"  - {j}" for j in jsons)
+            raise SystemExit(
+                f"{path} e uma pasta com varios JSON. Passe o arquivo:\n{listing}\n"
+                f"Ex.: python3 scripts/convert-lessons-pt.py \"{jsons[0]}\""
+            )
+        raise SystemExit(
+            f"{path} e uma pasta sem arquivos .json.\n"
+            f"Liste o conteudo: ls -la \"{path}\"\n"
+            "Depois passe o arquivo .json, nao a pasta."
+        )
+    raise SystemExit(
+        f"Nao encontrado: {path}\n"
+        "Passe o caminho do arquivo .json (ou da pasta que o contem).\n"
+        "Dica: no Finder, arraste o arquivo .json para o Terminal.\n"
+        "Ex.: python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json/lessons-pt.json"
+    )
+
+
 def main() -> None:
     p = argparse.ArgumentParser(
         description=__doc__,
         epilog=(
-            "Exemplo (use o caminho REAL do arquivo no seu Mac, nao um placeholder):\n"
-            "  python3 scripts/convert-lessons-pt.py ~/Downloads/lessons-pt.json\n"
+            "Exemplos:\n"
+            "  python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json/lessons-pt.json\n"
+            "  python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json\n"
             "  ./scripts/install-local-sample.sh"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -63,7 +102,7 @@ def main() -> None:
     p.add_argument(
         "input",
         type=Path,
-        help="Caminho real do JSON bruto (ex.: ~/Downloads/lessons-pt.json)",
+        help="Arquivo .json bruto OU pasta que contenha o .json",
     )
     p.add_argument(
         "-o",
@@ -73,17 +112,12 @@ def main() -> None:
         help="Saída reader-json (default: fixtures/local/lessons-pt.json)",
     )
     args = p.parse_args()
-    src = args.input.expanduser().resolve()
-    if not src.is_file():
-        raise SystemExit(
-            f"Arquivo nao encontrado: {src}\n"
-            "Passe o caminho real do lessons-pt.json (nao use /caminho/para/...).\n"
-            "Dica: arraste o arquivo do Finder para o Terminal para colar o path.\n"
-            "Ex.: python3 scripts/convert-lessons-pt.py ~/Downloads/lessons-pt.json"
-        )
+    src = resolve_input(args.input)
     data = json.loads(src.read_text(encoding="utf-8"))
     if not isinstance(data, list):
-        raise SystemExit("Entrada deve ser um array JSON de lições")
+        raise SystemExit(
+            f"Entrada deve ser um array JSON de lições (arquivo: {src})"
+        )
     doc = convert(data)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
