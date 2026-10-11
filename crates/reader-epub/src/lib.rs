@@ -98,9 +98,10 @@ fn parse_nav(xhtml: &str, nav_path: &str) -> Vec<TocEntry> {
                 .filter(|n| n.has_tag_name("a"))
                 .filter_map(|a| {
                     let href = a.attribute("href")?;
-                    let title: String = a.descendants().filter_map(|t| t.text()).collect();
+                    // `Node::text()` já concatena os text nodes filhos; não misturar com descendants.
+                    let title = a.text().unwrap_or("").trim().to_string();
                     Some(TocEntry {
-                        title: title.trim().to_string(),
+                        title,
                         href: format!("{dir}{href}"),
                         children: Vec::new(),
                     })

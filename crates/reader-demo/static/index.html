@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>reader-engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+    <header class="top">
+      <div class="brand-block">
+        <p class="brand">reader-engine</p>
+        <p class="tagline" id="subtitle">Escolha um livro para abrir a sessão</p>
+      </div>
+      <div class="toolbar" role="group" aria-label="Tema e tipografia">
+        <label class="field">
+          <span>Tema</span>
+          <select id="theme" aria-label="Tema do conteúdo">
+            <option value="material3">Material 3</option>
+            <option value="hig">HIG</option>
+            <option value="fluent">Fluent</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Texto</span>
+          <input id="scale" type="range" min="0.8" max="1.8" step="0.1" value="1" aria-label="Escala tipográfica" />
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <section class="shelf" id="shelf" aria-label="Livros de demonstração"></section>
+      <section class="stage" id="stage" hidden>
+        <aside class="toc" id="toc" aria-label="Sumário"></aside>
+        <div class="page-frame">
+          <iframe id="page" title="Conteúdo da página" sandbox=""></iframe>
+        </div>
+      </section>
+    </main>
+
+    <nav class="chrome" aria-label="Navegação do leitor">
+      <button type="button" id="prev" class="nav-btn" disabled aria-label="Página anterior">Anterior</button>
+      <p class="progress" id="progress" aria-live="polite">—</p>
+      <button type="button" id="next" class="nav-btn primary" disabled aria-label="Próxima página">Próxima</button>
+    </nav>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

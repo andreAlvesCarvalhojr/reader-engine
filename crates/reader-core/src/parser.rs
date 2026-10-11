@@ -9,7 +9,9 @@ pub struct Source {
 
 impl Source {
     pub fn extension(&self) -> Option<String> {
-        self.name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase())
+        self.name
+            .rsplit_once('.')
+            .map(|(_, e)| e.to_ascii_lowercase())
     }
 }
 
@@ -18,4 +20,27 @@ pub trait FormatParser: Send + Sync {
     fn id(&self) -> &'static str;
     fn can_parse(&self, src: &Source) -> bool;
     fn parse(&self, src: Source) -> Result<Publication>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extension_is_lowercase_suffix() {
+        let src = Source {
+            name: "Livro.EPUB".into(),
+            bytes: vec![],
+        };
+        assert_eq!(src.extension().as_deref(), Some("epub"));
+    }
+
+    #[test]
+    fn extension_none_without_dot() {
+        let src = Source {
+            name: "semext".into(),
+            bytes: vec![],
+        };
+        assert_eq!(src.extension(), None);
+    }
 }
