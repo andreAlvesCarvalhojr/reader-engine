@@ -12,7 +12,24 @@ webView.loadDataWithBaseURL(null, session.currentHtml(), "text/html", "utf-8", n
 | Fluxo | Quando usar |
 | --- | --- |
 | Assets (`samples/*.json`, `samples/*.epub`) | Demo / testes sem picker |
+| Assets locais (`samples/local/*`, gitignored) | Livros grandes de teste (ex.: `lessons-pt.json`) |
 | **Abrir arquivo** | Uso real: usuário escolhe `.epub` / `.json` |
+
+### Amostra local `lessons-pt.json` (não vai pro git)
+
+```bash
+# Na raiz do monorepo: coloque o reader-json em fixtures/local/
+mkdir -p fixtures/local
+cp /caminho/para/lessons-pt.json fixtures/local/
+
+# Copia para o app Android (aparece como chip "lessons-pt")
+./scripts/install-local-sample.sh
+
+# Rebuild / Run no Android Studio
+cd platforms/android && ./gradlew :app:installDebug
+```
+
+O app lista automaticamente tudo em `assets/samples/local/`. Sem esse arquivo, só aparecem Noite Clara e EPUB Fixture.
 
 ## Pré-requisitos
 
