@@ -12,7 +12,21 @@ webView.loadDataWithBaseURL(null, session.currentHtml(), "text/html", "utf-8", n
 | Fluxo | Quando usar |
 | --- | --- |
 | Assets (`samples/*.json`, `samples/*.epub`) | Demo / testes sem picker |
+| Assets locais (`samples/local/*`, gitignored) | Livros grandes de teste (ex.: `lessons-pt.json`) |
 | **Abrir arquivo** | Uso real: usuário escolhe `.epub` / `.json` |
+
+### Amostra local `lessons-pt.json` (não vai pro git)
+
+O arquivo bruto de lições (array JSON) precisa ser convertido para `reader-json`:
+
+```bash
+# Na raiz do monorepo
+python3 scripts/convert-lessons-pt.py /caminho/para/lessons-pt.json
+./scripts/install-local-sample.sh
+cd platforms/android && ./gradlew :app:installDebug
+```
+
+Depois disso aparece o chip **lessons-pt** no app. Sem o arquivo em `assets/samples/local/`, só ficam Noite Clara e EPUB Fixture.
 
 ## Pré-requisitos
 

@@ -1,5 +1,6 @@
 package com.readerengine.app
 
+import android.content.res.AssetManager
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebView
@@ -8,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val engine = ReaderEngine()
+        val samples = bundledSamples() + localSamples(assets)
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
@@ -63,6 +67,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = ComposeModifier.fillMaxSize()) {
                     ReaderScreen(
                         engine = engine,
+                        samples = samples,
                         readAsset = { path -> assets.open(path).use { it.readBytes() } },
                         readUri = { uri ->
                             contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -85,21 +90,38 @@ private data class SampleBook(
     val fileName: String,
 )
 
+private fun bundledSamples(): List<SampleBook> = listOf(
+    SampleBook("noite-clara", "Noite Clara", "samples/noite-clara.json", "noite-clara.json"),
+    SampleBook("epub-fixture", "EPUB Fixture", "samples/sample.epub", "sample.epub"),
+)
+
+/** Amostras em `assets/samples/local/` (gitignored; uso local de teste). */
+private fun localSamples(assets: AssetManager): List<SampleBook> {
+    val names = runCatching { assets.list("samples/local") }
+        .getOrNull()
+        .orEmpty()
+        .filter { it.endsWith(".json", ignoreCase = true) || it.endsWith(".epub", ignoreCase = true) }
+        .sorted()
+    return names.map { name ->
+        val stem = name.substringBeforeLast('.')
+        SampleBook(
+            id = "local-$stem",
+            title = stem,
+            assetPath = "samples/local/$name",
+            fileName = name,
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderScreen(
     engine: ReaderEngine,
+    samples: List<SampleBook>,
     readAsset: (String) -> ByteArray,
     readUri: (Uri) -> ByteArray,
     displayName: (Uri) -> String,
 ) {
-    val samples = remember {
-        listOf(
-            SampleBook("noite-clara", "Noite Clara", "samples/noite-clara.json", "noite-clara.json"),
-            SampleBook("epub-fixture", "EPUB Fixture", "samples/sample.epub", "sample.epub"),
-        )
-    }
-
     var session by remember { mutableStateOf<FfiReaderSession?>(null) }
     var snapshot by remember { mutableStateOf<ReaderSnapshot?>(null) }
     var html by remember { mutableStateOf("") }
@@ -136,8 +158,10 @@ private fun ReaderScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        val first = samples.first()
+    LaunchedEffect(samples) {
+        val first = samples.firstOrNull { it.id == "local-lessons-pt" }
+            ?: samples.firstOrNull()
+            ?: return@LaunchedEffect
         openBytes(first.fileName, readAsset(first.assetPath), first.id)
     }
 
@@ -198,7 +222,10 @@ private fun ReaderScreen(
             Spacer(modifier = ComposeModifier.height(12.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = ComposeModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = ComposeModifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
             ) {
                 samples.forEach { sample ->
                     FilterChip(
@@ -215,6 +242,8 @@ private fun ReaderScreen(
                             arrayOf(
                                 "application/epub+zip",
                                 "application/json",
+                                "text/json",
+                                "text/plain",
                                 "application/octet-stream",
                                 "*/*",
                             ),
