@@ -1,0 +1,12 @@
+{
+  "design_system": "fluent",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F3F3F3",
+    "on_surface": "#1A1A1A",
+    "primary": "#0F6CBD",
+    "on_primary": "#FFFFFF"
+  },
+  "typography": { "font_family": "'Segoe UI Variable', 'Segoe UI', sans-serif", "base_size_px": 14, "line_height": 1.43 },
+  "shape": { "corner_radius_px": 4, "spacing_unit_px": 4 }
+}

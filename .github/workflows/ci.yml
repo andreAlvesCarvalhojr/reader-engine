@@ -45,3 +45,15 @@ jobs:
 
       - name: Build demo
         run: cargo build -p reader-demo
+
+      - name: Build FFI (host)
+        run: cargo build -p reader-ffi
+
+      - name: Generate Kotlin bindings
+        run: |
+          cargo run -p reader-ffi --features bindgen --bin uniffi-bindgen -- \
+            generate --library target/debug/libreader_ffi.so \
+            --language kotlin \
+            --out-dir /tmp/reader-ffi-kt \
+            --config crates/reader-ffi/uniffi.toml \
+            --no-format

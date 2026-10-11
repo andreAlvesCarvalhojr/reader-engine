@@ -9,8 +9,10 @@ crates/
   reader-hpub   parser .hpub (Baker)
   reader-json   parser JSON próprio
   reader-demo   interface web de demonstração (Axum)
+  reader-ffi    UniFFI (Kotlin/Swift) — app envia (nome, bytes)
 themes/         tokens: material3 | hig | fluent
-platforms/      UI nativa (Compose+M3, SwiftUI+HIG, WinUI3+Fluent, Web Components)
+platforms/
+  android/      Compose + WebView (amostras + picker de arquivo)
 ```
 
 ## Desenvolvimento
@@ -20,6 +22,18 @@ cargo test --workspace
 cargo run -p reader-demo
 # abre http://127.0.0.1:8787
 ```
+
+### Android (FFI + WebView)
+
+A engine **não abre arquivos sozinha**. O app lê bytes (asset ou picker) e chama `ReaderEngine.open(name, bytes)`.
+
+```bash
+./scripts/generate-kotlin-bindings.sh   # regenera Kotlin
+./scripts/android-build-rust.sh         # precisa NDK → jniLibs/*.so
+# depois abra platforms/android no Android Studio
+```
+
+Detalhes: [`platforms/android/README.md`](platforms/android/README.md).
 
 Requer Rust 1.85+ (`rust-toolchain.toml`).
 
@@ -33,5 +47,6 @@ let publication = reg.open(Source { name: "livro.xyz".into(), bytes })?;
 ```
 
 ## Próximos passos
-1. Crate `reader-ffi` com UniFFI (Kotlin/Swift/C#) e `reader-wasm` (wasm-bindgen).
-2. `ContentHost` nativo (WebView) + UIs em `platforms/`.
+1. `reader-wasm` (wasm-bindgen) para web sem servidor.
+2. iOS (SwiftUI + WebView) reutilizando `reader-ffi`.
+3. Mais fixtures e ContentHost compartilhado.

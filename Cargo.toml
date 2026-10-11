@@ -6,6 +6,7 @@ members = [
     "crates/reader-hpub",
     "crates/reader-json",
     "crates/reader-demo",
+    "crates/reader-ffi",
 ]
 
 [workspace.package]

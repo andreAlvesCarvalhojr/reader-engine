@@ -1,0 +1,12 @@
+{
+  "design_system": "material3",
+  "colors": {
+    "background": "#FEF7FF",
+    "surface": "#FEF7FF",
+    "on_surface": "#1D1B20",
+    "primary": "#6750A4",
+    "on_primary": "#FFFFFF"
+  },
+  "typography": { "font_family": "Roboto, sans-serif", "base_size_px": 16, "line_height": 1.5 },
+  "shape": { "corner_radius_px": 12, "spacing_unit_px": 4 }
+}

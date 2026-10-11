@@ -1,0 +1,7 @@
+[bindings.kotlin]
+package_name = "uniffi.reader_ffi"
+cdylib_name = "reader_ffi"
+
+[bindings.swift]
+module_name = "ReaderFfi"
+cdylib_name = "reader_ffi"

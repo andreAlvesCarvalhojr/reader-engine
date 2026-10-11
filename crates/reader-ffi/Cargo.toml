@@ -1,0 +1,27 @@
+[package]
+name = "reader-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "UniFFI bindings for reader-engine (Kotlin/Swift/C#)"
+
+[lib]
+name = "reader_ffi"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+reader-core = { workspace = true, features = ["zip"] }
+reader-epub.workspace = true
+reader-hpub.workspace = true
+reader-json.workspace = true
+thiserror.workspace = true
+uniffi = "0.29"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+default = []
+bindgen = ["uniffi/cli"]
