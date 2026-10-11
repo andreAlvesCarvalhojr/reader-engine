@@ -1,7 +1,5 @@
 use reader_core::zip_provider::{has_zip_entry, ZipProvider};
-use reader_core::{
-    Error, FormatParser, Metadata, Publication, Resource, Result, Source, TocEntry,
-};
+use reader_core::{Error, FormatParser, Metadata, Publication, Resource, Result, Source, TocEntry};
 use std::sync::Arc;
 
 pub struct EpubParser;
@@ -20,14 +18,18 @@ impl FormatParser for EpubParser {
         let zip = ZipProvider::new(src.bytes)?;
 
         let container = zip.read_string("META-INF/container.xml")?;
-        let doc = roxmltree::Document::parse(&container).map_err(|e| Error::Invalid(e.to_string()))?;
+        let doc =
+            roxmltree::Document::parse(&container).map_err(|e| Error::Invalid(e.to_string()))?;
         let opf_path = doc
             .descendants()
             .find(|n| n.has_tag_name("rootfile"))
             .and_then(|n| n.attribute("full-path"))
             .ok_or_else(|| Error::Invalid("container.xml sem rootfile".into()))?
             .to_string();
-        let base = opf_path.rsplit_once('/').map(|(d, _)| format!("{d}/")).unwrap_or_default();
+        let base = opf_path
+            .rsplit_once('/')
+            .map(|(d, _)| format!("{d}/"))
+            .unwrap_or_default();
 
         let opf = zip.read_string(&opf_path)?;
         let opf = roxmltree::Document::parse(&opf).map_err(|e| Error::Invalid(e.to_string()))?;
@@ -57,7 +59,10 @@ impl FormatParser for EpubParser {
                 continue;
             };
             let full = format!("{base}{href}");
-            if item.attribute("properties").is_some_and(|p| p.split(' ').any(|x| x == "nav")) {
+            if item
+                .attribute("properties")
+                .is_some_and(|p| p.split(' ').any(|x| x == "nav"))
+            {
                 nav_href = Some(full.clone());
             }
             id_to_href.insert(id.to_string(), full.clone());
@@ -78,7 +83,13 @@ impl FormatParser for EpubParser {
             .and_then(|href| zip.read_string(&href).ok().map(|x| parse_nav(&x, &href)))
             .unwrap_or_default();
 
-        Ok(Publication { metadata, spine, resources, toc, provider: Arc::new(zip) })
+        Ok(Publication {
+            metadata,
+            spine,
+            resources,
+            toc,
+            provider: Arc::new(zip),
+        })
     }
 }
 
@@ -87,11 +98,15 @@ fn parse_nav(xhtml: &str, nav_path: &str) -> Vec<TocEntry> {
     let Ok(doc) = roxmltree::Document::parse(xhtml) else {
         return Vec::new();
     };
-    let dir = nav_path.rsplit_once('/').map(|(d, _)| format!("{d}/")).unwrap_or_default();
+    let dir = nav_path
+        .rsplit_once('/')
+        .map(|(d, _)| format!("{d}/"))
+        .unwrap_or_default();
     doc.descendants()
         .find(|n| {
             n.has_tag_name("nav")
-                && n.attributes().any(|a| a.name() == "type" && a.value().contains("toc"))
+                && n.attributes()
+                    .any(|a| a.name() == "type" && a.value().contains("toc"))
         })
         .map(|nav| {
             nav.descendants()

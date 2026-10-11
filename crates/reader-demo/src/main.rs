@@ -7,9 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use reader_core::{
-    Command, DesignSystem, Locator, ReaderSession, Registry, Source, ThemeTokens,
-};
+use reader_core::{Command, DesignSystem, Locator, ReaderSession, Registry, Source, ThemeTokens};
 use reader_epub::EpubParser;
 use reader_hpub::HpubParser;
 use reader_json::JsonParser;
@@ -89,7 +87,9 @@ fn load_source(id: &str) -> Option<Source> {
     match id {
         "noite-clara" => Some(Source {
             name: "noite-clara.json".into(),
-            bytes: include_str!("../samples/noite-clara.json").as_bytes().to_vec(),
+            bytes: include_str!("../samples/noite-clara.json")
+                .as_bytes()
+                .to_vec(),
         }),
         "epub-fixture" => Some(Source {
             name: "sample.epub".into(),
@@ -135,15 +135,11 @@ fn state_dto(book_id: Option<String>, session: &ReaderSession) -> StateDto {
             })
         })
         .collect();
-    let page_label = pub_
-        .spine
-        .get(st.locator.spine_index)
-        .cloned()
-        .or_else(|| {
-            pub_.toc
-                .get(st.locator.spine_index)
-                .map(|t| t.title.clone())
-        });
+    let page_label = pub_.spine.get(st.locator.spine_index).cloned().or_else(|| {
+        pub_.toc
+            .get(st.locator.spine_index)
+            .map(|t| t.title.clone())
+    });
     StateDto {
         book_id,
         title: Some(pub_.metadata.title.clone()),
@@ -171,7 +167,10 @@ async fn styles() -> Response {
 
 async fn app_js() -> Response {
     (
-        [(header::CONTENT_TYPE, "application/javascript; charset=utf-8")],
+        [(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
         include_str!("../static/app.js"),
     )
         .into_response()
@@ -243,9 +242,15 @@ async fn content(State(state): State<Arc<AppState>>) -> Result<Response, StatusC
         .spine
         .get(st.locator.spine_index)
         .ok_or(StatusCode::NOT_FOUND)?;
-    let bytes = session.publication().read(href).map_err(|_| StatusCode::NOT_FOUND)?;
+    let bytes = session
+        .publication()
+        .read(href)
+        .map_err(|_| StatusCode::NOT_FOUND)?;
     let mut html = String::from_utf8(bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let css = session.state().theme.to_content_css(session.state().font_scale);
+    let css = session
+        .state()
+        .theme
+        .to_content_css(session.state().font_scale);
     let inject = format!("<style>{css}</style>");
     if let Some(pos) = html.find("</head>") {
         html.insert_str(pos, &inject);
