@@ -1,6 +1,9 @@
 [bindings.kotlin]
 package_name = "uniffi.reader_ffi"
 cdylib_name = "reader_ffi"
+android = true
+android_cleaner = true
+kotlin_target_version = "2.0.0"
 
 [bindings.swift]
 module_name = "ReaderFfi"

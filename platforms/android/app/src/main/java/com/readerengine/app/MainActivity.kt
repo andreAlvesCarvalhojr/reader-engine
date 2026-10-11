@@ -36,7 +36,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +43,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import uniffi.reader_ffi.FfiReaderSession
 import uniffi.reader_ffi.ReaderEngine
 import uniffi.reader_ffi.ReaderSnapshot
+import androidx.compose.ui.Modifier as ComposeModifier
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,13 +60,13 @@ class MainActivity : ComponentActivity() {
                     onSurface = Color(0xFFD7EFE7),
                 ),
             ) {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(modifier = ComposeModifier.fillMaxSize()) {
                     ReaderScreen(
                         engine = engine,
                         readAsset = { path -> assets.open(path).use { it.readBytes() } },
                         readUri = { uri ->
                             contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                                ?: error("não foi possível ler $uri")
+                                ?: error("nao foi possivel ler $uri")
                         },
                         displayName = { uri ->
                             uri.lastPathSegment ?: "book.bin"
@@ -142,47 +142,45 @@ private fun ReaderScreen(
     }
 
     Scaffold(
-        modifier = Modifier
+        modifier = ComposeModifier
             .fillMaxSize()
             .statusBarsPadding()
             .navigationBarsPadding(),
         bottomBar = {
             val snap = snapshot
+            val index = snap?.spineIndex?.toInt() ?: 0
+            val total = snap?.spineLen?.toInt() ?: 0
             Row(
-                modifier = Modifier
+                modifier = ComposeModifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedButton(
-                    onClick = {
-                        session?.let { refresh(it, it.prev()) }
-                    },
-                    enabled = snap != null && snap.spineIndex > 0u,
-                    modifier = Modifier.height(48.dp),
+                    onClick = { session?.let { refresh(it, it.prev()) } },
+                    enabled = snap != null && index > 0,
+                    modifier = ComposeModifier.height(48.dp),
                 ) {
                     Text("Anterior")
                 }
                 Text(
-                    text = if (snap == null) "—" else "${snap.spineIndex + 1u} / ${snap.spineLen}",
-                    modifier = Modifier.weight(1f),
+                    text = if (snap == null) "-" else "${index + 1} / $total",
+                    modifier = ComposeModifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Button(
-                    onClick = {
-                        session?.let { refresh(it, it.next()) }
-                    },
-                    enabled = snap != null && snap.spineIndex + 1u < snap.spineLen,
-                    modifier = Modifier.height(48.dp),
+                    onClick = { session?.let { refresh(it, it.next()) } },
+                    enabled = snap != null && index + 1 < total,
+                    modifier = ComposeModifier.height(48.dp),
                 ) {
-                    Text("Próxima")
+                    Text("Proxima")
                 }
             }
         },
     ) { padding ->
         Column(
-            modifier = Modifier
+            modifier = ComposeModifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
@@ -197,10 +195,10 @@ private fun ReaderScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
             )
-            Spacer(Modifier = Modifier.height(12.dp))
+            Spacer(modifier = ComposeModifier.height(12.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = ComposeModifier.fillMaxWidth(),
             ) {
                 samples.forEach { sample ->
                     FilterChip(
@@ -222,12 +220,12 @@ private fun ReaderScreen(
                             ),
                         )
                     },
-                    modifier = Modifier.height(40.dp),
+                    modifier = ComposeModifier.height(40.dp),
                 ) {
                     Text("Abrir arquivo")
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = ComposeModifier.height(8.dp))
             Text("Texto", style = MaterialTheme.typography.labelMedium)
             Slider(
                 value = fontScale,
@@ -239,10 +237,10 @@ private fun ReaderScreen(
             )
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = ComposeModifier.height(8.dp))
             }
             AndroidView(
-                modifier = Modifier
+                modifier = ComposeModifier
                     .fillMaxWidth()
                     .weight(1f),
                 factory = { context ->
