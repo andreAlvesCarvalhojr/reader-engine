@@ -7,3 +7,6 @@ app/build/
 app/src/main/jniLibs/**/*.so
 captures/
 .cxx/
+
+# Local-only sample books (not committed)
+app/src/main/assets/samples/local/
