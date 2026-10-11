@@ -17,19 +17,16 @@ webView.loadDataWithBaseURL(null, session.currentHtml(), "text/html", "utf-8", n
 
 ### Amostra local `lessons-pt.json` (não vai pro git)
 
+O arquivo bruto de lições (array JSON) precisa ser convertido para `reader-json`:
+
 ```bash
-# Na raiz do monorepo: coloque o reader-json em fixtures/local/
-mkdir -p fixtures/local
-cp /caminho/para/lessons-pt.json fixtures/local/
-
-# Copia para o app Android (aparece como chip "lessons-pt")
+# Na raiz do monorepo
+python3 scripts/convert-lessons-pt.py /caminho/para/lessons-pt.json
 ./scripts/install-local-sample.sh
-
-# Rebuild / Run no Android Studio
 cd platforms/android && ./gradlew :app:installDebug
 ```
 
-O app lista automaticamente tudo em `assets/samples/local/`. Sem esse arquivo, só aparecem Noite Clara e EPUB Fixture.
+Depois disso aparece o chip **lessons-pt** no app. Sem o arquivo em `assets/samples/local/`, só ficam Noite Clara e EPUB Fixture.
 
 ## Pré-requisitos
 
