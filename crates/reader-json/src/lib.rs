@@ -1,5 +1,5 @@
 use reader_core::{
-    Error, FormatParser, Metadata, Publication, Resource, Result, ResourceProvider, Source,
+    Error, FormatParser, Metadata, Publication, Resource, ResourceProvider, Result, Source,
     TocEntry,
 };
 use serde::Deserialize;
@@ -144,7 +144,10 @@ mod tests {
 
         assert_eq!(pub_.metadata.title, "Noite Clara");
         assert_eq!(pub_.metadata.authors, vec!["Ana".to_string()]);
-        assert_eq!(pub_.spine, vec!["p1.html".to_string(), "p2.html".to_string()]);
+        assert_eq!(
+            pub_.spine,
+            vec!["p1.html".to_string(), "p2.html".to_string()]
+        );
         assert_eq!(pub_.toc[0].title, "Abertura");
         assert_eq!(pub_.toc[1].title, "p2");
         assert_eq!(

@@ -15,10 +15,7 @@ fn parses_fixture_metadata_spine_and_toc() {
     assert_eq!(pub_.metadata.authors, vec!["Baker".to_string()]);
     assert_eq!(
         pub_.spine,
-        vec![
-            "pages/one.html".to_string(),
-            "pages/two.html".to_string()
-        ]
+        vec!["pages/one.html".to_string(), "pages/two.html".to_string()]
     );
     assert_eq!(pub_.toc[0].title, "pages/one.html");
     assert_eq!(pub_.toc[1].title, "Segundo");
