@@ -157,7 +157,7 @@ impl FfiReaderSession {
         snapshot_of(&g)
     }
 
-    /// JSON de tokens (`themes/*.json`) aplicado ao conteúdo.
+    /// JSON de tokens de tema (arquivos em themes/) aplicado ao conteúdo.
     pub fn set_theme_json(&self, json: String) -> Result<ReaderSnapshot, ReaderFfiError> {
         let theme = ThemeTokens::from_json(&json)?;
         let mut g = self.inner.lock().expect("session lock");
