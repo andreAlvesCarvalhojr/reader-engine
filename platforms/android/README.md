@@ -17,14 +17,17 @@ webView.loadDataWithBaseURL(null, session.currentHtml(), "text/html", "utf-8", n
 
 ### Amostra local `lessons-pt.json` (não vai pro git)
 
-O arquivo bruto de lições (array JSON) precisa ser convertido para `reader-json`:
+O arquivo bruto de lições (array JSON) precisa ser convertido para `reader-json`.
+Use o **caminho real** do arquivo no Mac (não um placeholder):
 
 ```bash
-# Na raiz do monorepo
-python3 scripts/convert-lessons-pt.py /caminho/para/lessons-pt.json
+# Na raiz do monorepo — exemplo se o arquivo estiver em Downloads:
+python3 scripts/convert-lessons-pt.py ~/Downloads/lessons-pt.json
 ./scripts/install-local-sample.sh
 cd platforms/android && ./gradlew :app:installDebug
 ```
+
+Dica: no Terminal, arraste o `.json` do Finder para a janela — o macOS cola o path completo.
 
 Depois disso aparece o chip **lessons-pt** no app. Sem o arquivo em `assets/samples/local/`, só ficam Noite Clara e EPUB Fixture.
 
