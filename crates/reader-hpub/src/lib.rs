@@ -46,12 +46,19 @@ impl FormatParser for HpubParser {
                 Content::Path(p) => (p.clone(), p),
                 Content::Entry { url, title } => (url.clone(), title.unwrap_or(url)),
             };
-            toc.push(TocEntry { title, href: url.clone(), children: Vec::new() });
+            toc.push(TocEntry {
+                title,
+                href: url.clone(),
+                children: Vec::new(),
+            });
             spine.push(url);
         }
         let resources = spine
             .iter()
-            .map(|h| Resource { href: h.clone(), media_type: "text/html".into() })
+            .map(|h| Resource {
+                href: h.clone(),
+                media_type: "text/html".into(),
+            })
             .collect();
 
         Ok(Publication {

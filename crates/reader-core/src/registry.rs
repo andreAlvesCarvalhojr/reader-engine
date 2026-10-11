@@ -87,8 +87,7 @@ mod tests {
     #[test]
     fn open_uses_first_matching_parser() {
         let mut reg = Registry::new();
-        reg.register(Box::new(AlwaysJson))
-            .register(Box::new(Never));
+        reg.register(Box::new(AlwaysJson)).register(Box::new(Never));
         let pub_ = reg
             .open(Source {
                 name: "book.json".into(),
