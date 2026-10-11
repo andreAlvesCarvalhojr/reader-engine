@@ -4,8 +4,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 cargo build -p reader-ffi
+case "$(uname -s)" in
+  Darwin) LIB="${ROOT}/target/debug/libreader_ffi.dylib" ;;
+  *) LIB="${ROOT}/target/debug/libreader_ffi.so" ;;
+esac
+test -f "${LIB}"
 cargo run -p reader-ffi --features bindgen --bin uniffi-bindgen -- \
-  generate --library "${ROOT}/target/debug/libreader_ffi.so" \
+  generate --library "${LIB}" \
   --language kotlin \
   --out-dir "${ROOT}/platforms/android/app/src/main/java" \
   --config "${ROOT}/crates/reader-ffi/uniffi.toml" \
