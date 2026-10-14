@@ -62,3 +62,47 @@ jobs:
             --out-dir /tmp/reader-ffi-kt \
             --config crates/reader-ffi/uniffi.toml \
             --no-format
+
+  android:
+    name: Android build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: android
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager --install "ndk;27.0.12077973"
+
+      - name: Build Rust for Android
+        run: ./scripts/android-build-rust.sh
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+
+      - name: Verify Kotlin bindings are up-to-date
+        run: |
+          if ! git diff --exit-code platforms/android/app/src/main/java/uniffi/reader_ffi/; then
+            echo "::error::Kotlin bindings are out of date. Run ./scripts/generate-kotlin-bindings.sh and commit the changes."
+            exit 1
+          fi
+
+      - name: Build Android app
+        working-directory: platforms/android
+        run: ./gradlew assembleDebug --no-daemon
