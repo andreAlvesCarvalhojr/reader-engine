@@ -10,6 +10,8 @@ const theme = document.getElementById("theme");
 const scale = document.getElementById("scale");
 
 let current = null;
+let scrollTimeout = null;
+let lastReportedProgression = 0;
 
 async function api(path, options) {
   const res = await fetch(path, {
@@ -61,19 +63,103 @@ async function refreshContent() {
   page.srcdoc = html;
 }
 
+function getScrollProgression() {
+  try {
+    const doc = page.contentDocument;
+    if (!doc || !doc.body) return 0;
+    
+    const scrollTop = doc.documentElement.scrollTop || doc.body.scrollTop || 0;
+    const scrollHeight = doc.documentElement.scrollHeight || doc.body.scrollHeight || 1;
+    const clientHeight = doc.documentElement.clientHeight || doc.body.clientHeight || 0;
+    
+    const maxScroll = Math.max(0, scrollHeight - clientHeight);
+    if (maxScroll === 0) return 0;
+    
+    return Math.min(1, Math.max(0, scrollTop / maxScroll));
+  } catch (e) {
+    return 0;
+  }
+}
+
+async function reportProgression(progression) {
+  if (!current) return;
+  const diff = Math.abs(progression - lastReportedProgression);
+  if (diff < 0.01) return;
+  
+  lastReportedProgression = progression;
+  const state = await api("/api/command", {
+    method: "POST",
+    body: JSON.stringify({ type: "report_progression", progression }),
+  });
+  paintState(state);
+}
+
+function handleIframeScroll() {
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    const progression = getScrollProgression();
+    reportProgression(progression);
+  }, 150);
+}
+
+function setupScrollListener() {
+  try {
+    const doc = page.contentDocument;
+    if (doc) {
+      doc.removeEventListener("scroll", handleIframeScroll);
+      doc.addEventListener("scroll", handleIframeScroll, { passive: true });
+    }
+  } catch (e) {
+    // Cross-origin or not ready
+  }
+}
+
+page.addEventListener("load", () => {
+  setupScrollListener();
+  if (current && current.chapter_progress > 0) {
+    restoreScrollPosition(current.chapter_progress);
+  }
+});
+
+function restoreScrollPosition(progression) {
+  try {
+    const doc = page.contentDocument;
+    if (!doc || !doc.body) return;
+    
+    const scrollHeight = doc.documentElement.scrollHeight || doc.body.scrollHeight || 0;
+    const clientHeight = doc.documentElement.clientHeight || doc.body.clientHeight || 0;
+    const maxScroll = Math.max(0, scrollHeight - clientHeight);
+    
+    const scrollTop = maxScroll * progression;
+    doc.documentElement.scrollTop = scrollTop;
+    doc.body.scrollTop = scrollTop;
+  } catch (e) {
+    // Cross-origin or not ready
+  }
+}
+
+function formatProgress(value) {
+  return `${Math.round(value * 100)}%`;
+}
+
 function paintState(state) {
   current = state;
   stage.hidden = false;
   markActiveBook(state.book_id);
   subtitle.textContent = [state.title, state.authors?.join(", ")].filter(Boolean).join(" · ");
-  progress.textContent =
-    state.spine_len > 0
-      ? `${state.spine_index + 1} / ${state.spine_len}`
-      : "sem páginas";
+  
+  const chapterInfo = state.spine_len > 0
+    ? `${state.spine_index + 1} / ${state.spine_len}`
+    : "sem páginas";
+  const chapterProg = formatProgress(state.chapter_progress ?? 0);
+  const bookProg = formatProgress(state.book_progress ?? 0);
+  progress.innerHTML = `<span class="chapter-progress">${chapterInfo}</span> · <span class="book-progress">📖 ${bookProg}</span>`;
+  
   prev.disabled = !state.spine_len || state.spine_index <= 0;
   next.disabled = !state.spine_len || state.spine_index >= state.spine_len - 1;
   theme.value = state.theme || "material3";
   scale.value = String(state.font_scale ?? 1);
+  lastReportedProgression = state.chapter_progress ?? 0;
   renderToc(state);
 }
 

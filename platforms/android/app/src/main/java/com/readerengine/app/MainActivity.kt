@@ -1,10 +1,12 @@
 package com.readerengine.app
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.AssetManager
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -28,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -60,6 +63,16 @@ import java.io.ByteArrayInputStream
 import androidx.compose.ui.Modifier as ComposeModifier
 
 private const val BOOK_BASE_URL = "book://content/"
+
+/** JavaScript interface for receiving scroll position from WebView. */
+class ScrollProgressInterface(
+    private val onProgressChanged: (Float) -> Unit,
+) {
+    @JavascriptInterface
+    fun reportProgress(progress: Float) {
+        onProgressChanged(progress.coerceIn(0f, 1f))
+    }
+}
 
 /** Manages reading position persistence using SharedPreferences. */
 class ReadingPositionStore(context: Context) {
@@ -219,6 +232,8 @@ private fun ReaderScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var fontScale by remember { mutableFloatStateOf(1f) }
     var activeSample by remember { mutableStateOf<String?>(null) }
+    var bookProgress by remember { mutableFloatStateOf(0f) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     fun saveCurrentPosition() {
         val s = session ?: return
@@ -232,8 +247,16 @@ private fun ReaderScreen(
         session = from
         snapshot = snap
         fontScale = snap.fontScale
+        bookProgress = snap.bookProgress
         html = from.currentHtml()
         error = null
+    }
+
+    fun onScrollProgressChanged(progress: Float) {
+        val s = session ?: return
+        val newSnap = s.reportProgression(progress)
+        snapshot = newSnap
+        bookProgress = newSnap.bookProgress
     }
 
     fun openBytes(name: String, bytes: ByteArray, sampleId: String?) {
@@ -310,11 +333,20 @@ private fun ReaderScreen(
                 ) {
                     Text("Anterior")
                 }
-                Text(
-                    text = if (snap == null) "-" else "${index + 1} / $total",
+                Column(
                     modifier = ComposeModifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = if (snap == null) "-" else "${index + 1} / $total",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = if (snap == null) "" else "${(bookProgress * 100).toInt()}% concluído",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    )
+                }
                 Button(
                     onClick = { session?.let { refresh(it, it.next()) } },
                     enabled = snap != null && index + 1 < total,
@@ -390,6 +422,14 @@ private fun ReaderScreen(
                 Text(it, color = MaterialTheme.colorScheme.error)
                 Spacer(modifier = ComposeModifier.height(8.dp))
             }
+            LinearProgressIndicator(
+                progress = { bookProgress },
+                modifier = ComposeModifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Spacer(modifier = ComposeModifier.height(4.dp))
+            @SuppressLint("SetJavaScriptEnabled")
             AndroidView(
                 modifier = ComposeModifier
                     .fillMaxWidth()
@@ -397,10 +437,17 @@ private fun ReaderScreen(
                 factory = { context ->
                     WebView(context).apply {
                         webViewClient = BookResourceWebViewClient { session }
-                        settings.javaScriptEnabled = false
+                        settings.javaScriptEnabled = true
                         settings.allowFileAccess = false
                         settings.allowContentAccess = false
                         setBackgroundColor(0xFFF3FAF7.toInt())
+                        addJavascriptInterface(
+                            ScrollProgressInterface { progress ->
+                                post { onScrollProgressChanged(progress) }
+                            },
+                            "AndroidScrollProgress",
+                        )
+                        webViewRef = this
                     }
                 },
                 update = { webView ->

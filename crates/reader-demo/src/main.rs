@@ -40,6 +40,10 @@ struct StateDto {
     theme: String,
     toc: Vec<TocDto>,
     page_label: Option<String>,
+    /// Current chapter progress (0.0..=1.0).
+    chapter_progress: f32,
+    /// Overall book progress (0.0..=1.0).
+    book_progress: f32,
 }
 
 #[derive(Serialize)]
@@ -58,9 +62,22 @@ struct OpenBody {
 enum CmdBody {
     Next,
     Prev,
-    GoTo { spine_index: usize },
-    SetFontScale { scale: f32 },
-    SetTheme { theme: String },
+    GoTo {
+        spine_index: usize,
+    },
+    GoToWithProgression {
+        spine_index: usize,
+        progression: f32,
+    },
+    SetFontScale {
+        scale: f32,
+    },
+    SetTheme {
+        theme: String,
+    },
+    ReportProgression {
+        progression: f32,
+    },
 }
 
 #[derive(Deserialize)]
@@ -165,6 +182,8 @@ fn state_dto(book_id: Option<String>, session: &ReaderSession) -> StateDto {
         theme: theme_key(&st.theme),
         toc,
         page_label,
+        chapter_progress: session.chapter_progress(),
+        book_progress: session.book_progress(),
     }
 }
 
@@ -237,11 +256,23 @@ async fn command(
                 progression: 0.0,
             }));
         }
+        CmdBody::GoToWithProgression {
+            spine_index,
+            progression,
+        } => {
+            session.dispatch(Command::GoTo(Locator {
+                spine_index,
+                progression,
+            }));
+        }
         CmdBody::SetFontScale { scale } => {
             session.dispatch(Command::SetFontScale(scale));
         }
         CmdBody::SetTheme { theme } => {
             session.dispatch(Command::SetTheme(theme_named(&theme)));
+        }
+        CmdBody::ReportProgression { progression } => {
+            session.dispatch(Command::ReportProgression(progression));
         }
     }
     let book_id = state.book_id.lock().unwrap().clone();
