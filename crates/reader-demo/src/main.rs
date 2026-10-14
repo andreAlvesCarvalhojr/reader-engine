@@ -89,9 +89,15 @@ enum CmdBody {
     ReportProgression {
         progression: f32,
     },
-    ToggleBookmark { label: Option<String> },
-    RemoveBookmark { id: String },
-    GoToBookmark { id: String },
+    ToggleBookmark {
+        label: Option<String>,
+    },
+    RemoveBookmark {
+        id: String,
+    },
+    GoToBookmark {
+        id: String,
+    },
 }
 
 #[derive(Deserialize)]
