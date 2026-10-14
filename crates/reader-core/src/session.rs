@@ -1,4 +1,5 @@
 use crate::model::{Bookmark, Locator, Publication};
+use crate::search::SearchResult;
 use crate::theme::ThemeTokens;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -69,6 +70,15 @@ impl ReaderSession {
 
     pub fn publication(&self) -> &Publication {
         &self.publication
+    }
+
+    /// Searches for `query` across all spine items.
+    ///
+    /// Returns results with spine index, approximate progression within each chapter,
+    /// and a snippet of text around each match. Search is case-insensitive and
+    /// accent-insensitive.
+    pub fn search(&self, query: &str) -> Vec<SearchResult> {
+        self.publication.search(query)
     }
 
     pub fn dispatch(&mut self, cmd: Command) -> &ReaderState {

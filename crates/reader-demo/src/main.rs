@@ -7,7 +7,9 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use reader_core::{Command, DesignSystem, Locator, ReaderSession, Registry, Source, ThemeTokens};
+use reader_core::{
+    Command, DesignSystem, Locator, ReaderSession, Registry, SearchResult, Source, ThemeTokens,
+};
 use reader_epub::EpubParser;
 use reader_hpub::HpubParser;
 use reader_json::JsonParser;
@@ -36,6 +38,25 @@ struct BookmarkDto {
     progression: f32,
     label: Option<String>,
     created_at: u64,
+}
+
+#[derive(Serialize)]
+struct SearchResultDto {
+    spine_index: usize,
+    progression: f32,
+    snippet: String,
+    href: String,
+}
+
+impl From<SearchResult> for SearchResultDto {
+    fn from(r: SearchResult) -> Self {
+        Self {
+            spine_index: r.spine_index,
+            progression: r.progression,
+            snippet: r.snippet,
+            href: r.href,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -103,6 +124,11 @@ enum CmdBody {
 #[derive(Deserialize)]
 struct ResourceQuery {
     href: String,
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    q: String,
 }
 
 fn sample_books() -> &'static [BookInfo] {
@@ -435,6 +461,20 @@ async fn book_resource(
     Ok(([(header::CONTENT_TYPE, media_type)], bytes).into_response())
 }
 
+async fn search(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<Vec<SearchResultDto>>, StatusCode> {
+    let guard = state.session.lock().unwrap();
+    let session = guard.as_ref().ok_or(StatusCode::NOT_FOUND)?;
+    let results = session
+        .search(&query.q)
+        .into_iter()
+        .map(SearchResultDto::from)
+        .collect();
+    Ok(Json(results))
+}
+
 #[tokio::main]
 async fn main() {
     let mut registry = Registry::new();
@@ -459,6 +499,7 @@ async fn main() {
         .route("/api/command", post(command))
         .route("/api/content", get(content))
         .route("/api/resource", get(resource))
+        .route("/api/search", get(search))
         .route("/book/*href", get(book_resource))
         .layer(CorsLayer::permissive())
         .with_state(state);
