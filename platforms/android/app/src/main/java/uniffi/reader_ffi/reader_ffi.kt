@@ -45,19 +45,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 open class RustBuffer : Structure() {
     // Note: `capacity` and `len` are actually `ULong` values, but JVM only supports signed values.
     // When dealing with these fields, make sure to call `toULong()`.
-    @JvmField
-    var capacity: Long = 0
+    @JvmField var capacity: Long = 0
+    @JvmField var len: Long = 0
+    @JvmField var data: Pointer? = null
 
-    @JvmField
-    var len: Long = 0
+    class ByValue: RustBuffer(), Structure.ByValue
+    class ByReference: RustBuffer(), Structure.ByReference
 
-    @JvmField
-    var data: Pointer? = null
-
-    class ByValue : RustBuffer(), Structure.ByValue
-    class ByReference : RustBuffer(), Structure.ByReference
-
-    internal fun setValue(other: RustBuffer) {
+   internal fun setValue(other: RustBuffer) {
         capacity = other.capacity
         len = other.len
         data = other.data
@@ -68,9 +63,9 @@ open class RustBuffer : Structure() {
             // Note: need to convert the size to a `Long` value to make this work with JVM.
             UniffiLib.INSTANCE.ffi_reader_ffi_rustbuffer_alloc(size.toLong(), status)
         }.also {
-            if (it.data == null) {
-                throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
-            }
+            if(it.data == null) {
+               throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
+           }
         }
 
         internal fun create(capacity: ULong, len: ULong, data: Pointer?): RustBuffer.ByValue {
@@ -135,15 +130,11 @@ class RustBufferByReference : ByReference(16) {
 
 @Structure.FieldOrder("len", "data")
 internal open class ForeignBytes : Structure() {
-    @JvmField
-    var len: Int = 0
-
-    @JvmField
-    var data: Pointer? = null
+    @JvmField var len: Int = 0
+    @JvmField var data: Pointer? = null
 
     class ByValue : ForeignBytes(), Structure.ByValue
 }
-
 /**
  * The FfiConverter interface handles converter types to and from the FFI
  *
@@ -203,11 +194,11 @@ public interface FfiConverter<KotlinType, FfiType> {
     fun liftFromRustBuffer(rbuf: RustBuffer.ByValue): KotlinType {
         val byteBuf = rbuf.asByteBuffer()!!
         try {
-            val item = read(byteBuf)
-            if (byteBuf.hasRemaining()) {
-                throw RuntimeException("junk remaining in buffer after lifting, something is very wrong!!")
-            }
-            return item
+           val item = read(byteBuf)
+           if (byteBuf.hasRemaining()) {
+               throw RuntimeException("junk remaining in buffer after lifting, something is very wrong!!")
+           }
+           return item
         } finally {
             RustBuffer.free(rbuf)
         }
@@ -219,7 +210,7 @@ public interface FfiConverter<KotlinType, FfiType> {
  *
  * @suppress
  */
-public interface FfiConverterRustBuffer<KotlinType> : FfiConverter<KotlinType, RustBuffer.ByValue> {
+public interface FfiConverterRustBuffer<KotlinType>: FfiConverter<KotlinType, RustBuffer.ByValue> {
     override fun lift(value: RustBuffer.ByValue) = liftFromRustBuffer(value)
     override fun lower(value: KotlinType) = lowerIntoRustBuffer(value)
 }
@@ -232,13 +223,10 @@ internal const val UNIFFI_CALL_UNEXPECTED_ERROR = 2.toByte()
 
 @Structure.FieldOrder("code", "error_buf")
 internal open class UniffiRustCallStatus : Structure() {
-    @JvmField
-    var code: Byte = 0
+    @JvmField var code: Byte = 0
+    @JvmField var error_buf: RustBuffer.ByValue = RustBuffer.ByValue()
 
-    @JvmField
-    var error_buf: RustBuffer.ByValue = RustBuffer.ByValue()
-
-    class ByValue : UniffiRustCallStatus(), Structure.ByValue
+    class ByValue: UniffiRustCallStatus(), Structure.ByValue
 
     fun isSuccess(): Boolean {
         return code == UNIFFI_CALL_SUCCESS
@@ -278,10 +266,7 @@ interface UniffiRustCallStatusErrorHandler<E> {
 // synchronize itself
 
 // Call a rust function that returns a Result<>.  Pass in the Error class companion that corresponds to the Err
-private inline fun <U, E : kotlin.Exception> uniffiRustCallWithError(
-    errorHandler: UniffiRustCallStatusErrorHandler<E>,
-    callback: (UniffiRustCallStatus) -> U
-): U {
+private inline fun <U, E: kotlin.Exception> uniffiRustCallWithError(errorHandler: UniffiRustCallStatusErrorHandler<E>, callback: (UniffiRustCallStatus) -> U): U {
     var status = UniffiRustCallStatus()
     val return_value = callback(status)
     uniffiCheckCallStatus(errorHandler, status)
@@ -289,10 +274,7 @@ private inline fun <U, E : kotlin.Exception> uniffiRustCallWithError(
 }
 
 // Check UniffiRustCallStatus and throw an error if the call wasn't successful
-private fun <E : kotlin.Exception> uniffiCheckCallStatus(
-    errorHandler: UniffiRustCallStatusErrorHandler<E>,
-    status: UniffiRustCallStatus
-) {
+private fun<E: kotlin.Exception> uniffiCheckCallStatus(errorHandler: UniffiRustCallStatusErrorHandler<E>, status: UniffiRustCallStatus) {
     if (status.isSuccess()) {
         return
     } else if (status.isError()) {
@@ -316,7 +298,7 @@ private fun <E : kotlin.Exception> uniffiCheckCallStatus(
  *
  * @suppress
  */
-object UniffiNullRustCallStatusErrorHandler : UniffiRustCallStatusErrorHandler<InternalException> {
+object UniffiNullRustCallStatusErrorHandler: UniffiRustCallStatusErrorHandler<InternalException> {
     override fun lift(error_buf: RustBuffer.ByValue): InternalException {
         RustBuffer.free(error_buf)
         return InternalException("Unexpected CALL_ERROR")
@@ -328,20 +310,20 @@ private inline fun <U> uniffiRustCall(callback: (UniffiRustCallStatus) -> U): U 
     return uniffiRustCallWithError(UniffiNullRustCallStatusErrorHandler, callback)
 }
 
-internal inline fun <T> uniffiTraitInterfaceCall(
+internal inline fun<T> uniffiTraitInterfaceCall(
     callStatus: UniffiRustCallStatus,
     makeCall: () -> T,
     writeReturn: (T) -> Unit,
 ) {
     try {
         writeReturn(makeCall())
-    } catch (e: kotlin.Exception) {
+    } catch(e: kotlin.Exception) {
         callStatus.code = UNIFFI_CALL_UNEXPECTED_ERROR
         callStatus.error_buf = FfiConverterString.lower(e.toString())
     }
 }
 
-internal inline fun <T, reified E : Throwable> uniffiTraitInterfaceCallWithError(
+internal inline fun<T, reified E: Throwable> uniffiTraitInterfaceCallWithError(
     callStatus: UniffiRustCallStatus,
     makeCall: () -> T,
     writeReturn: (T) -> Unit,
@@ -349,7 +331,7 @@ internal inline fun <T, reified E : Throwable> uniffiTraitInterfaceCallWithError
 ) {
     try {
         writeReturn(makeCall())
-    } catch (e: kotlin.Exception) {
+    } catch(e: kotlin.Exception) {
         if (e is E) {
             callStatus.code = UNIFFI_CALL_ERROR
             callStatus.error_buf = lowerError(e)
@@ -359,11 +341,10 @@ internal inline fun <T, reified E : Throwable> uniffiTraitInterfaceCallWithError
         }
     }
 }
-
 // Map handles to objects
 //
 // This is used pass an opaque 64-bit handle representing a foreign object to the Rust code.
-internal class UniffiHandleMap<T : Any> {
+internal class UniffiHandleMap<T: Any> {
     private val map = ConcurrentHashMap<Long, T>()
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
 
@@ -407,17 +388,14 @@ private inline fun <reified Lib : Library> loadIndirect(
 
 // Define FFI callback types
 internal interface UniffiRustFutureContinuationCallback : com.sun.jna.Callback {
-    fun callback(`data`: Long, `pollResult`: Byte)
+    fun callback(`data`: Long,`pollResult`: Byte,)
 }
-
 internal interface UniffiForeignFutureFree : com.sun.jna.Callback {
-    fun callback(`handle`: Long)
+    fun callback(`handle`: Long,)
 }
-
 internal interface UniffiCallbackInterfaceFree : com.sun.jna.Callback {
-    fun callback(`handle`: Long)
+    fun callback(`handle`: Long,)
 }
-
 @Structure.FieldOrder("handle", "free")
 internal open class UniffiForeignFuture(
     @JvmField internal var `handle`: Long = 0.toLong(),
@@ -426,15 +404,14 @@ internal open class UniffiForeignFuture(
     class UniffiByValue(
         `handle`: Long = 0.toLong(),
         `free`: UniffiForeignFutureFree? = null,
-    ) : UniffiForeignFuture(`handle`, `free`), Structure.ByValue
+    ): UniffiForeignFuture(`handle`,`free`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFuture) {
+   internal fun uniffiSetValue(other: UniffiForeignFuture) {
         `handle` = other.`handle`
         `free` = other.`free`
     }
 
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructU8(
     @JvmField internal var `returnValue`: Byte = 0.toByte(),
@@ -443,19 +420,17 @@ internal open class UniffiForeignFutureStructU8(
     class UniffiByValue(
         `returnValue`: Byte = 0.toByte(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructU8(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructU8(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructU8) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructU8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteU8 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructU8.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU8.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructI8(
     @JvmField internal var `returnValue`: Byte = 0.toByte(),
@@ -464,19 +439,17 @@ internal open class UniffiForeignFutureStructI8(
     class UniffiByValue(
         `returnValue`: Byte = 0.toByte(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructI8(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructI8(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructI8) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructI8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteI8 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructI8.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI8.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructU16(
     @JvmField internal var `returnValue`: Short = 0.toShort(),
@@ -485,19 +458,17 @@ internal open class UniffiForeignFutureStructU16(
     class UniffiByValue(
         `returnValue`: Short = 0.toShort(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructU16(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructU16(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructU16) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructU16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteU16 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructU16.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU16.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructI16(
     @JvmField internal var `returnValue`: Short = 0.toShort(),
@@ -506,19 +477,17 @@ internal open class UniffiForeignFutureStructI16(
     class UniffiByValue(
         `returnValue`: Short = 0.toShort(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructI16(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructI16(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructI16) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructI16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteI16 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructI16.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI16.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructU32(
     @JvmField internal var `returnValue`: Int = 0,
@@ -527,19 +496,17 @@ internal open class UniffiForeignFutureStructU32(
     class UniffiByValue(
         `returnValue`: Int = 0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructU32(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructU32(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructU32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructU32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteU32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructU32.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU32.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructI32(
     @JvmField internal var `returnValue`: Int = 0,
@@ -548,19 +515,17 @@ internal open class UniffiForeignFutureStructI32(
     class UniffiByValue(
         `returnValue`: Int = 0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructI32(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructI32(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructI32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructI32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteI32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructI32.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI32.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructU64(
     @JvmField internal var `returnValue`: Long = 0.toLong(),
@@ -569,19 +534,17 @@ internal open class UniffiForeignFutureStructU64(
     class UniffiByValue(
         `returnValue`: Long = 0.toLong(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructU64(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructU64(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructU64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructU64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteU64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructU64.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU64.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructI64(
     @JvmField internal var `returnValue`: Long = 0.toLong(),
@@ -590,19 +553,17 @@ internal open class UniffiForeignFutureStructI64(
     class UniffiByValue(
         `returnValue`: Long = 0.toLong(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructI64(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructI64(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructI64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructI64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteI64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructI64.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI64.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructF32(
     @JvmField internal var `returnValue`: Float = 0.0f,
@@ -611,19 +572,17 @@ internal open class UniffiForeignFutureStructF32(
     class UniffiByValue(
         `returnValue`: Float = 0.0f,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructF32(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructF32(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructF32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructF32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteF32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructF32.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructF32.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructF64(
     @JvmField internal var `returnValue`: Double = 0.0,
@@ -632,19 +591,17 @@ internal open class UniffiForeignFutureStructF64(
     class UniffiByValue(
         `returnValue`: Double = 0.0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructF64(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructF64(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructF64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructF64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteF64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructF64.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructF64.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructPointer(
     @JvmField internal var `returnValue`: Pointer = Pointer.NULL,
@@ -653,19 +610,17 @@ internal open class UniffiForeignFutureStructPointer(
     class UniffiByValue(
         `returnValue`: Pointer = Pointer.NULL,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructPointer(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructPointer(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructPointer) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructPointer) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompletePointer : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructPointer.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructPointer.UniffiByValue,)
 }
-
 @Structure.FieldOrder("returnValue", "callStatus")
 internal open class UniffiForeignFutureStructRustBuffer(
     @JvmField internal var `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
@@ -674,39 +629,115 @@ internal open class UniffiForeignFutureStructRustBuffer(
     class UniffiByValue(
         `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructRustBuffer(`returnValue`, `callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructRustBuffer) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructRustBuffer) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteRustBuffer : com.sun.jna.Callback {
-    fun callback(
-        `callbackData`: Long,
-        `result`: UniffiForeignFutureStructRustBuffer.UniffiByValue,
-    )
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructRustBuffer.UniffiByValue,)
 }
-
 @Structure.FieldOrder("callStatus")
 internal open class UniffiForeignFutureStructVoid(
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ) : UniffiForeignFutureStructVoid(`callStatus`), Structure.ByValue
+    ): UniffiForeignFutureStructVoid(`callStatus`,), Structure.ByValue
 
-    internal fun uniffiSetValue(other: UniffiForeignFutureStructVoid) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureStructVoid) {
         `callStatus` = other.`callStatus`
     }
 
 }
-
 internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long, `result`: UniffiForeignFutureStructVoid.UniffiByValue)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructVoid.UniffiByValue,)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // For large crates we prevent `MethodTooLargeException` (see #2340)
@@ -725,34 +756,29 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
     fun uniffi_reader_ffi_checksum_method_ffireadersession_current_html(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_next(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_prev(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_set_theme_json(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_snapshot(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_method_readerengine_open(
-    ): Short
-
-    fun uniffi_reader_ffi_checksum_constructor_readerengine_new(
-    ): Short
-
-    fun ffi_reader_ffi_uniffi_contract_version(
-    ): Int
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_get_position(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_next(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_prev(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_restore_position(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_set_theme_json(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_snapshot(
+): Short
+fun uniffi_reader_ffi_checksum_method_readerengine_open(
+): Short
+fun uniffi_reader_ffi_checksum_constructor_readerengine_new(
+): Short
+fun ffi_reader_ffi_uniffi_contract_version(
+): Int
 
 }
 
@@ -792,7 +818,7 @@ internal interface UniffiLib : Library {
             // Loading of library with integrity check done.
             lib
         }
-
+        
         // The Cleaner for the whole library
         internal val CLEANER: UniffiCleaner by lazy {
             UniffiCleaner.create()
@@ -800,284 +826,148 @@ internal interface UniffiLib : Library {
     }
 
     // FFI functions
-    fun uniffi_reader_ffi_fn_clone_ffireadersession(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): Pointer
-
-    fun uniffi_reader_ffi_fn_free_ffireadersession(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): Unit
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_current_html(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_go_to(
-        `ptr`: Pointer, `spineIndex`: Int, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_next(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_prev(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(
-        `ptr`: Pointer, `scale`: Float, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_set_theme_json(
-        `ptr`: Pointer, `json`: RustBuffer.ByValue, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_method_ffireadersession_snapshot(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun uniffi_reader_ffi_fn_clone_readerengine(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): Pointer
-
-    fun uniffi_reader_ffi_fn_free_readerengine(
-        `ptr`: Pointer, uniffi_out_err: UniffiRustCallStatus,
-    ): Unit
-
-    fun uniffi_reader_ffi_fn_constructor_readerengine_new(
-        uniffi_out_err: UniffiRustCallStatus,
-    ): Pointer
-
-    fun uniffi_reader_ffi_fn_method_readerengine_open(
-        `ptr`: Pointer,
-        `name`: RustBuffer.ByValue,
-        `bytes`: RustBuffer.ByValue,
-        uniffi_out_err: UniffiRustCallStatus,
-    ): Pointer
-
-    fun ffi_reader_ffi_rustbuffer_alloc(
-        `size`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun ffi_reader_ffi_rustbuffer_from_bytes(
-        `bytes`: ForeignBytes.ByValue, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun ffi_reader_ffi_rustbuffer_free(
-        `buf`: RustBuffer.ByValue, uniffi_out_err: UniffiRustCallStatus,
-    ): Unit
-
-    fun ffi_reader_ffi_rustbuffer_reserve(
-        `buf`: RustBuffer.ByValue, `additional`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun ffi_reader_ffi_rust_future_poll_u8(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_u8(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_u8(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_u8(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Byte
-
-    fun ffi_reader_ffi_rust_future_poll_i8(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_i8(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_i8(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_i8(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Byte
-
-    fun ffi_reader_ffi_rust_future_poll_u16(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_u16(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_u16(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_u16(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Short
-
-    fun ffi_reader_ffi_rust_future_poll_i16(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_i16(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_i16(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_i16(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Short
-
-    fun ffi_reader_ffi_rust_future_poll_u32(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_u32(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_u32(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_u32(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Int
-
-    fun ffi_reader_ffi_rust_future_poll_i32(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_i32(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_i32(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_i32(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Int
-
-    fun ffi_reader_ffi_rust_future_poll_u64(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_u64(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_u64(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_u64(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Long
-
-    fun ffi_reader_ffi_rust_future_poll_i64(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_i64(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_i64(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_i64(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Long
-
-    fun ffi_reader_ffi_rust_future_poll_f32(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_f32(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_f32(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_f32(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Float
-
-    fun ffi_reader_ffi_rust_future_poll_f64(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_f64(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_f64(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_f64(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Double
-
-    fun ffi_reader_ffi_rust_future_poll_pointer(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_pointer(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_pointer(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_pointer(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Pointer
-
-    fun ffi_reader_ffi_rust_future_poll_rust_buffer(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_rust_buffer(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_rust_buffer(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_rust_buffer(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    fun ffi_reader_ffi_rust_future_poll_void(
-        `handle`: Long, `callback`: UniffiRustFutureContinuationCallback, `callbackData`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_cancel_void(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_free_void(
-        `handle`: Long,
-    ): Unit
-
-    fun ffi_reader_ffi_rust_future_complete_void(
-        `handle`: Long, uniffi_out_err: UniffiRustCallStatus,
-    ): Unit
+    fun uniffi_reader_ffi_fn_clone_ffireadersession(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_reader_ffi_fn_free_ffireadersession(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_reader_ffi_fn_method_ffireadersession_current_html(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_get_position(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_go_to(`ptr`: Pointer,`spineIndex`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_next(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_prev(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_restore_position(`ptr`: Pointer,`position`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(`ptr`: Pointer,`scale`: Float,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_set_theme_json(`ptr`: Pointer,`json`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_clone_readerengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_reader_ffi_fn_free_readerengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun uniffi_reader_ffi_fn_constructor_readerengine_new(uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun uniffi_reader_ffi_fn_method_readerengine_open(`ptr`: Pointer,`name`: RustBuffer.ByValue,`bytes`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun ffi_reader_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_reader_ffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_reader_ffi_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+fun ffi_reader_ffi_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_reader_ffi_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_u8(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_u8(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+fun ffi_reader_ffi_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_i8(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_i8(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+fun ffi_reader_ffi_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_u16(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_u16(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+fun ffi_reader_ffi_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_i16(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_i16(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+fun ffi_reader_ffi_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_u32(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_u32(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+fun ffi_reader_ffi_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_i32(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_i32(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+fun ffi_reader_ffi_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_u64(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_u64(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+fun ffi_reader_ffi_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_i64(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_i64(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+fun ffi_reader_ffi_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_f32(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_f32(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Float
+fun ffi_reader_ffi_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_f64(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_f64(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Double
+fun ffi_reader_ffi_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_pointer(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_pointer(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Pointer
+fun ffi_reader_ffi_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_rust_buffer(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_rust_buffer(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun ffi_reader_ffi_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_cancel_void(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_free_void(`handle`: Long,
+): Unit
+fun ffi_reader_ffi_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
 
 }
 
@@ -1090,10 +980,12 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI contract version mismatch: try cleaning and rebuilding your project")
     }
 }
-
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_current_html() != 32182.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_get_position() != 57669.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to() != 39203.toShort()) {
@@ -1103,6 +995,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_prev() != 63917.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_restore_position() != 64462.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale() != 10257.toShort()) {
@@ -1144,7 +1039,6 @@ public fun uniffiEnsureInitialized() {
 // helper method to execute a block and destroy the object at the end.
 interface Disposable {
     fun destroy()
-
     companion object {
         fun destroy(vararg args: Any?) {
             for (arg in args) {
@@ -1158,7 +1052,6 @@ interface Disposable {
                             }
                         }
                     }
-
                     is Map<*, *> -> {
                         for (element in arg.values) {
                             if (element is Disposable) {
@@ -1166,7 +1059,6 @@ interface Disposable {
                             }
                         }
                     }
-
                     is Iterable<*> -> {
                         for (element in arg) {
                             if (element is Disposable) {
@@ -1201,7 +1093,6 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
  * @suppress
  * */
 object NoPointer
-
 /**
  * The cleaner interface for Object finalization code to run.
  * This is the entry point to any implementation that we're using.
@@ -1270,7 +1161,7 @@ private class AndroidSystemCleanable(
 /**
  * @suppress
  */
-public object FfiConverterUInt : FfiConverter<UInt, Int> {
+public object FfiConverterUInt: FfiConverter<UInt, Int> {
     override fun lift(value: Int): UInt {
         return value.toUInt()
     }
@@ -1293,7 +1184,7 @@ public object FfiConverterUInt : FfiConverter<UInt, Int> {
 /**
  * @suppress
  */
-public object FfiConverterFloat : FfiConverter<Float, Float> {
+public object FfiConverterFloat: FfiConverter<Float, Float> {
     override fun lift(value: Float): Float {
         return value
     }
@@ -1316,7 +1207,7 @@ public object FfiConverterFloat : FfiConverter<Float, Float> {
 /**
  * @suppress
  */
-public object FfiConverterString : FfiConverter<String, RustBuffer.ByValue> {
+public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
     // Note: we don't inherit from FfiConverterRustBuffer, because we use a
     // special encoding when lowering/lifting.  We can use `RustBuffer.len` to
     // store our length and avoid writing it out to the buffer.
@@ -1373,18 +1264,16 @@ public object FfiConverterString : FfiConverter<String, RustBuffer.ByValue> {
 /**
  * @suppress
  */
-public object FfiConverterByteArray : FfiConverterRustBuffer<ByteArray> {
+public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
     override fun read(buf: ByteBuffer): ByteArray {
         val len = buf.getInt()
         val byteArr = ByteArray(len)
         buf.get(byteArr)
         return byteArr
     }
-
     override fun allocationSize(value: ByteArray): ULong {
         return 4UL + value.size.toULong()
     }
-
     override fun write(value: ByteArray, buf: ByteBuffer) {
         buf.putInt(value.size)
         buf.put(value)
@@ -1494,34 +1383,45 @@ public object FfiConverterByteArray : FfiConverterRustBuffer<ByteArray> {
  * Sessão de leitura controlada pela UI nativa.
  */
 public interface FfiReaderSessionInterface {
-
+    
     /**
      * HTML da página atual com CSS de tema injetado (para WebView).
      */
     fun `currentHtml`(): kotlin.String
-
+    
+    /**
+     * Returns the current reading position for persistence.
+     */
+    fun `getPosition`(): SavedPosition
+    
     fun `goTo`(`spineIndex`: kotlin.UInt): ReaderSnapshot
-
+    
     fun `next`(): ReaderSnapshot
-
+    
     fun `prev`(): ReaderSnapshot
-
+    
+    /**
+     * Restores a previously saved reading position.
+     */
+    fun `restorePosition`(`position`: SavedPosition): ReaderSnapshot
+    
     fun `setFontScale`(`scale`: kotlin.Float): ReaderSnapshot
-
+    
     /**
      * JSON de tokens de tema (arquivos em themes/) aplicado ao conteúdo.
      */
     fun `setThemeJson`(`json`: kotlin.String): ReaderSnapshot
-
+    
     fun `snapshot`(): ReaderSnapshot
-
+    
     companion object
 }
 
 /**
  * Sessão de leitura controlada pela UI nativa.
  */
-open class FfiReaderSession : Disposable, AutoCloseable, FfiReaderSessionInterface {
+open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -1572,7 +1472,7 @@ open class FfiReaderSession : Disposable, AutoCloseable, FfiReaderSessionInterfa
             if (c == Long.MAX_VALUE) {
                 throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
             }
-        } while (!this.callCounter.compareAndSet(c, c + 1L))
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
         // Now we can safely do the method call without the pointer being freed concurrently.
         try {
             return block(this.uniffiClonePointer())
@@ -1602,114 +1502,140 @@ open class FfiReaderSession : Disposable, AutoCloseable, FfiReaderSessionInterfa
         }
     }
 
-
+    
     /**
      * HTML da página atual com CSS de tema injetado (para WebView).
      */
-    @Throws(ReaderFfiException::class)
-    override fun `currentHtml`(): kotlin.String {
-        return FfiConverterString.lift(
-            callWithPointer {
-                uniffiRustCallWithError(ReaderFfiException) { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_current_html(
-                        it, _status
-                    )
-                }
-            }
-        )
+    @Throws(ReaderFfiException::class)override fun `currentHtml`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCallWithError(ReaderFfiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_current_html(
+        it, _status)
+}
     }
+    )
+    }
+    
 
+    
+    /**
+     * Returns the current reading position for persistence.
+     */override fun `getPosition`(): SavedPosition {
+            return FfiConverterTypeSavedPosition.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_get_position(
+        it, _status)
+}
+    }
+    )
+    }
+    
 
     override fun `goTo`(`spineIndex`: kotlin.UInt): ReaderSnapshot {
-        return FfiConverterTypeReaderSnapshot.lift(
-            callWithPointer {
-                uniffiRustCall() { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_go_to(
-                        it, FfiConverterUInt.lower(`spineIndex`), _status
-                    )
-                }
-            }
-        )
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_go_to(
+        it, FfiConverterUInt.lower(`spineIndex`),_status)
+}
     }
-
+    )
+    }
+    
 
     override fun `next`(): ReaderSnapshot {
-        return FfiConverterTypeReaderSnapshot.lift(
-            callWithPointer {
-                uniffiRustCall() { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_next(
-                        it, _status
-                    )
-                }
-            }
-        )
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_next(
+        it, _status)
+}
     }
-
+    )
+    }
+    
 
     override fun `prev`(): ReaderSnapshot {
-        return FfiConverterTypeReaderSnapshot.lift(
-            callWithPointer {
-                uniffiRustCall() { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_prev(
-                        it, _status
-                    )
-                }
-            }
-        )
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_prev(
+        it, _status)
+}
     }
+    )
+    }
+    
 
+    
+    /**
+     * Restores a previously saved reading position.
+     */override fun `restorePosition`(`position`: SavedPosition): ReaderSnapshot {
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_restore_position(
+        it, FfiConverterTypeSavedPosition.lower(`position`),_status)
+}
+    }
+    )
+    }
+    
 
     override fun `setFontScale`(`scale`: kotlin.Float): ReaderSnapshot {
-        return FfiConverterTypeReaderSnapshot.lift(
-            callWithPointer {
-                uniffiRustCall() { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(
-                        it, FfiConverterFloat.lower(`scale`), _status
-                    )
-                }
-            }
-        )
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(
+        it, FfiConverterFloat.lower(`scale`),_status)
+}
     }
+    )
+    }
+    
 
-
+    
     /**
      * JSON de tokens de tema (arquivos em themes/) aplicado ao conteúdo.
      */
-    @Throws(ReaderFfiException::class)
-    override fun `setThemeJson`(`json`: kotlin.String): ReaderSnapshot {
-        return FfiConverterTypeReaderSnapshot.lift(
-            callWithPointer {
-                uniffiRustCallWithError(ReaderFfiException) { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_set_theme_json(
-                        it, FfiConverterString.lower(`json`), _status
-                    )
-                }
-            }
-        )
+    @Throws(ReaderFfiException::class)override fun `setThemeJson`(`json`: kotlin.String): ReaderSnapshot {
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCallWithError(ReaderFfiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_set_theme_json(
+        it, FfiConverterString.lower(`json`),_status)
+}
     }
-
+    )
+    }
+    
 
     override fun `snapshot`(): ReaderSnapshot {
-        return FfiConverterTypeReaderSnapshot.lift(
-            callWithPointer {
-                uniffiRustCall() { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_snapshot(
-                        it, _status
-                    )
-                }
-            }
-        )
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_snapshot(
+        it, _status)
+}
     }
+    )
+    }
+    
 
+    
 
+    
+    
     companion object
-
+    
 }
 
 /**
  * @suppress
  */
-public object FfiConverterTypeFfiReaderSession : FfiConverter<FfiReaderSession, Pointer> {
+public object FfiConverterTypeFfiReaderSession: FfiConverter<FfiReaderSession, Pointer> {
 
     override fun lower(value: FfiReaderSession): Pointer {
         return value.uniffiClonePointer()
@@ -1837,19 +1763,20 @@ public object FfiConverterTypeFfiReaderSession : FfiConverter<FfiReaderSession, 
  * Fábrica: abre publicações a partir de bytes fornecidos pelo app.
  */
 public interface ReaderEngineInterface {
-
+    
     /**
      * Abre EPUB / HPUB / reader-json (ou formato registrado) a partir dos bytes.
      */
     fun `open`(`name`: kotlin.String, `bytes`: kotlin.ByteArray): FfiReaderSession
-
+    
     companion object
 }
 
 /**
  * Fábrica: abre publicações a partir de bytes fornecidos pelo app.
  */
-open class ReaderEngine : Disposable, AutoCloseable, ReaderEngineInterface {
+open class ReaderEngine: Disposable, AutoCloseable, ReaderEngineInterface
+{
 
     constructor(pointer: Pointer) {
         this.pointer = pointer
@@ -1866,15 +1793,13 @@ open class ReaderEngine : Disposable, AutoCloseable, ReaderEngineInterface {
         this.pointer = null
         this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
     }
-
     constructor() :
-            this(
-                uniffiRustCall() { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_constructor_readerengine_new(
-                        _status
-                    )
-                }
-            )
+        this(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_constructor_readerengine_new(
+        _status)
+}
+    )
 
     protected val pointer: Pointer?
     protected val cleanable: UniffiCleaner.Cleanable
@@ -1909,7 +1834,7 @@ open class ReaderEngine : Disposable, AutoCloseable, ReaderEngineInterface {
             if (c == Long.MAX_VALUE) {
                 throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
             }
-        } while (!this.callCounter.compareAndSet(c, c + 1L))
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
         // Now we can safely do the method call without the pointer being freed concurrently.
         try {
             return block(this.uniffiClonePointer())
@@ -1939,35 +1864,34 @@ open class ReaderEngine : Disposable, AutoCloseable, ReaderEngineInterface {
         }
     }
 
-
+    
     /**
      * Abre EPUB / HPUB / reader-json (ou formato registrado) a partir dos bytes.
      */
-    @Throws(ReaderFfiException::class)
-    override fun `open`(`name`: kotlin.String, `bytes`: kotlin.ByteArray): FfiReaderSession {
-        return FfiConverterTypeFfiReaderSession.lift(
-            callWithPointer {
-                uniffiRustCallWithError(ReaderFfiException) { _status ->
-                    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_readerengine_open(
-                        it,
-                        FfiConverterString.lower(`name`),
-                        FfiConverterByteArray.lower(`bytes`),
-                        _status
-                    )
-                }
-            }
-        )
+    @Throws(ReaderFfiException::class)override fun `open`(`name`: kotlin.String, `bytes`: kotlin.ByteArray): FfiReaderSession {
+            return FfiConverterTypeFfiReaderSession.lift(
+    callWithPointer {
+    uniffiRustCallWithError(ReaderFfiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_readerengine_open(
+        it, FfiConverterString.lower(`name`),FfiConverterByteArray.lower(`bytes`),_status)
+}
     }
+    )
+    }
+    
 
+    
 
+    
+    
     companion object
-
+    
 }
 
 /**
  * @suppress
  */
-public object FfiConverterTypeReaderEngine : FfiConverter<ReaderEngine, Pointer> {
+public object FfiConverterTypeReaderEngine: FfiConverter<ReaderEngine, Pointer> {
 
     override fun lower(value: ReaderEngine): Pointer {
         return value.uniffiClonePointer()
@@ -1993,25 +1917,30 @@ public object FfiConverterTypeReaderEngine : FfiConverter<ReaderEngine, Pointer>
 }
 
 
+
 /**
  * Snapshot do estado para a UI observar.
  */
-data class ReaderSnapshot(
-    var `title`: kotlin.String,
-    var `authors`: List<kotlin.String>,
-    var `spineIndex`: kotlin.UInt,
-    var `spineLen`: kotlin.UInt,
-    var `fontScale`: kotlin.Float,
-    var `toc`: List<TocItem>
+data class ReaderSnapshot (
+    var `title`: kotlin.String, 
+    var `authors`: List<kotlin.String>, 
+    var `spineIndex`: kotlin.UInt, 
+    var `spineLen`: kotlin.UInt, 
+    var `fontScale`: kotlin.Float, 
+    var `toc`: List<TocItem>, 
+    /**
+     * Stable identifier for the book, used as key for persisting reading position.
+     */
+    var `bookId`: kotlin.String
 ) {
-
+    
     companion object
 }
 
 /**
  * @suppress
  */
-public object FfiConverterTypeReaderSnapshot : FfiConverterRustBuffer<ReaderSnapshot> {
+public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnapshot> {
     override fun read(buf: ByteBuffer): ReaderSnapshot {
         return ReaderSnapshot(
             FfiConverterString.read(buf),
@@ -2020,44 +1949,86 @@ public object FfiConverterTypeReaderSnapshot : FfiConverterRustBuffer<ReaderSnap
             FfiConverterUInt.read(buf),
             FfiConverterFloat.read(buf),
             FfiConverterSequenceTypeTocItem.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
     override fun allocationSize(value: ReaderSnapshot) = (
             FfiConverterString.allocationSize(value.`title`) +
-                    FfiConverterSequenceString.allocationSize(value.`authors`) +
-                    FfiConverterUInt.allocationSize(value.`spineIndex`) +
-                    FfiConverterUInt.allocationSize(value.`spineLen`) +
-                    FfiConverterFloat.allocationSize(value.`fontScale`) +
-                    FfiConverterSequenceTypeTocItem.allocationSize(value.`toc`)
-            )
+            FfiConverterSequenceString.allocationSize(value.`authors`) +
+            FfiConverterUInt.allocationSize(value.`spineIndex`) +
+            FfiConverterUInt.allocationSize(value.`spineLen`) +
+            FfiConverterFloat.allocationSize(value.`fontScale`) +
+            FfiConverterSequenceTypeTocItem.allocationSize(value.`toc`) +
+            FfiConverterString.allocationSize(value.`bookId`)
+    )
 
     override fun write(value: ReaderSnapshot, buf: ByteBuffer) {
-        FfiConverterString.write(value.`title`, buf)
-        FfiConverterSequenceString.write(value.`authors`, buf)
-        FfiConverterUInt.write(value.`spineIndex`, buf)
-        FfiConverterUInt.write(value.`spineLen`, buf)
-        FfiConverterFloat.write(value.`fontScale`, buf)
-        FfiConverterSequenceTypeTocItem.write(value.`toc`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterSequenceString.write(value.`authors`, buf)
+            FfiConverterUInt.write(value.`spineIndex`, buf)
+            FfiConverterUInt.write(value.`spineLen`, buf)
+            FfiConverterFloat.write(value.`fontScale`, buf)
+            FfiConverterSequenceTypeTocItem.write(value.`toc`, buf)
+            FfiConverterString.write(value.`bookId`, buf)
     }
 }
 
 
-/**
- * Item do sumário com índice no spine.
- */
-data class TocItem(
-    var `title`: kotlin.String,
-    var `spineIndex`: kotlin.UInt
-) {
 
+/**
+ * Reading position that can be persisted and restored.
+ */
+data class SavedPosition (
+    var `spineIndex`: kotlin.UInt, 
+    /**
+     * 0.0..=1.0 progression within the spine item.
+     */
+    var `progression`: kotlin.Float
+) {
+    
     companion object
 }
 
 /**
  * @suppress
  */
-public object FfiConverterTypeTocItem : FfiConverterRustBuffer<TocItem> {
+public object FfiConverterTypeSavedPosition: FfiConverterRustBuffer<SavedPosition> {
+    override fun read(buf: ByteBuffer): SavedPosition {
+        return SavedPosition(
+            FfiConverterUInt.read(buf),
+            FfiConverterFloat.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SavedPosition) = (
+            FfiConverterUInt.allocationSize(value.`spineIndex`) +
+            FfiConverterFloat.allocationSize(value.`progression`)
+    )
+
+    override fun write(value: SavedPosition, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`spineIndex`, buf)
+            FfiConverterFloat.write(value.`progression`, buf)
+    }
+}
+
+
+
+/**
+ * Item do sumário com índice no spine.
+ */
+data class TocItem (
+    var `title`: kotlin.String, 
+    var `spineIndex`: kotlin.UInt
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTocItem: FfiConverterRustBuffer<TocItem> {
     override fun read(buf: ByteBuffer): TocItem {
         return TocItem(
             FfiConverterString.read(buf),
@@ -2067,36 +2038,38 @@ public object FfiConverterTypeTocItem : FfiConverterRustBuffer<TocItem> {
 
     override fun allocationSize(value: TocItem) = (
             FfiConverterString.allocationSize(value.`title`) +
-                    FfiConverterUInt.allocationSize(value.`spineIndex`)
-            )
+            FfiConverterUInt.allocationSize(value.`spineIndex`)
+    )
 
     override fun write(value: TocItem, buf: ByteBuffer) {
-        FfiConverterString.write(value.`title`, buf)
-        FfiConverterUInt.write(value.`spineIndex`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterUInt.write(value.`spineIndex`, buf)
     }
 }
+
+
+
 
 
 /**
  * Erro exposto às linguagens estrangeiras.
  */
-sealed class ReaderFfiException : kotlin.Exception() {
-
+sealed class ReaderFfiException: kotlin.Exception() {
+    
     class Engine(
-
+        
         val `msg`: kotlin.String
-    ) : ReaderFfiException() {
+        ) : ReaderFfiException() {
         override val message
-            get() = "msg=${`msg`}"
+            get() = "msg=${ `msg` }"
     }
-
+    
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<ReaderFfiException> {
-        override fun lift(error_buf: RustBuffer.ByValue): ReaderFfiException =
-            FfiConverterTypeReaderFfiError.lift(error_buf)
+        override fun lift(error_buf: RustBuffer.ByValue): ReaderFfiException = FfiConverterTypeReaderFfiError.lift(error_buf)
     }
 
-
+    
 }
 
 /**
@@ -2104,29 +2077,28 @@ sealed class ReaderFfiException : kotlin.Exception() {
  */
 public object FfiConverterTypeReaderFfiError : FfiConverterRustBuffer<ReaderFfiException> {
     override fun read(buf: ByteBuffer): ReaderFfiException {
+        
 
-
-        return when (buf.getInt()) {
+        return when(buf.getInt()) {
             1 -> ReaderFfiException.Engine(
                 FfiConverterString.read(buf),
-            )
-
+                )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
 
     override fun allocationSize(value: ReaderFfiException): ULong {
-        return when (value) {
+        return when(value) {
             is ReaderFfiException.Engine -> (
-                    // Add the size for the Int that specifies the variant plus the size needed for all fields
-                    4UL
-                            + FfiConverterString.allocationSize(value.`msg`)
-                    )
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
         }
     }
 
     override fun write(value: ReaderFfiException, buf: ByteBuffer) {
-        when (value) {
+        when(value) {
             is ReaderFfiException.Engine -> {
                 buf.putInt(1)
                 FfiConverterString.write(value.`msg`, buf)
@@ -2138,10 +2110,12 @@ public object FfiConverterTypeReaderFfiError : FfiConverterRustBuffer<ReaderFfiE
 }
 
 
+
+
 /**
  * @suppress
  */
-public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.String>> {
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
         return List<kotlin.String>(len) {
@@ -2164,10 +2138,12 @@ public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.St
 }
 
 
+
+
 /**
  * @suppress
  */
-public object FfiConverterSequenceTypeTocItem : FfiConverterRustBuffer<List<TocItem>> {
+public object FfiConverterSequenceTypeTocItem: FfiConverterRustBuffer<List<TocItem>> {
     override fun read(buf: ByteBuffer): List<TocItem> {
         val len = buf.getInt()
         return List<TocItem>(len) {
