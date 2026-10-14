@@ -750,6 +750,16 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -765,13 +775,22 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 // when the library is loaded.
 internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
-    fun uniffi_reader_ffi_checksum_method_ffireadersession_current_html(
+    fun uniffi_reader_ffi_checksum_method_ffireadersession_add_bookmark(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_current_html(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_export_bookmarks_json(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_get_position(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to_with_progression(
+fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to_bookmark(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_import_bookmarks_json(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_list_bookmarks(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_list_resources(
 ): Short
@@ -782,6 +801,7 @@ fun uniffi_reader_ffi_checksum_method_ffireadersession_prev(
 fun uniffi_reader_ffi_checksum_method_ffireadersession_read_resource(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_report_progression(
+fun uniffi_reader_ffi_checksum_method_ffireadersession_remove_bookmark(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type(
 ): Short
@@ -792,6 +812,8 @@ fun uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale(
 fun uniffi_reader_ffi_checksum_method_ffireadersession_set_theme_json(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_snapshot(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_toggle_bookmark(
 ): Short
 fun uniffi_reader_ffi_checksum_method_readerengine_open(
 ): Short
@@ -850,13 +872,22 @@ internal interface UniffiLib : Library {
 ): Pointer
 fun uniffi_reader_ffi_fn_free_ffireadersession(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
+fun uniffi_reader_ffi_fn_method_ffireadersession_add_bookmark(`ptr`: Pointer,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_current_html(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_export_bookmarks_json(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_get_position(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_go_to(`ptr`: Pointer,`spineIndex`: Int,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_go_to_with_progression(`ptr`: Pointer,`spineIndex`: Int,`progression`: Float,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_reader_ffi_fn_method_ffireadersession_go_to_bookmark(`ptr`: Pointer,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_import_bookmarks_json(`ptr`: Pointer,`json`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_list_bookmarks(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_list_resources(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -868,6 +899,8 @@ fun uniffi_reader_ffi_fn_method_ffireadersession_read_resource(`ptr`: Pointer,`h
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_report_progression(`ptr`: Pointer,`progression`: Float,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_remove_bookmark(`ptr`: Pointer,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
 fun uniffi_reader_ffi_fn_method_ffireadersession_resource_media_type(`ptr`: Pointer,`href`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_restore_position(`ptr`: Pointer,`position`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -877,6 +910,8 @@ fun uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(`ptr`: Pointer,`
 fun uniffi_reader_ffi_fn_method_ffireadersession_set_theme_json(`ptr`: Pointer,`json`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_snapshot(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_toggle_bookmark(`ptr`: Pointer,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_clone_readerengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): Pointer
@@ -1012,7 +1047,13 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_add_bookmark() != 59323.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_current_html() != 32182.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_export_bookmarks_json() != 40765.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_get_position() != 57669.toShort()) {
@@ -1022,6 +1063,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to_with_progression() != 50952.toShort()) {
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to_bookmark() != 20391.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_import_bookmarks_json() != 22944.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_list_bookmarks() != 57872.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_list_resources() != 31945.toShort()) {
@@ -1037,6 +1085,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_report_progression() != 42353.toShort()) {
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_remove_bookmark() != 47942.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type() != 14435.toShort()) {
@@ -1052,6 +1101,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_snapshot() != 30726.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_toggle_bookmark() != 27956.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_readerengine_open() != 36642.toShort()) {
@@ -1229,6 +1281,29 @@ public object FfiConverterUInt: FfiConverter<UInt, Int> {
 /**
  * @suppress
  */
+public object FfiConverterULong: FfiConverter<ULong, Long> {
+    override fun lift(value: Long): ULong {
+        return value.toULong()
+    }
+
+    override fun read(buf: ByteBuffer): ULong {
+        return lift(buf.getLong())
+    }
+
+    override fun lower(value: ULong): Long {
+        return value.toLong()
+    }
+
+    override fun allocationSize(value: ULong) = 8UL
+
+    override fun write(value: ULong, buf: ByteBuffer) {
+        buf.putLong(value.toLong())
+    }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterFloat: FfiConverter<Float, Float> {
     override fun lift(value: Float): Float {
         return value
@@ -1246,6 +1321,29 @@ public object FfiConverterFloat: FfiConverter<Float, Float> {
 
     override fun write(value: Float, buf: ByteBuffer) {
         buf.putFloat(value)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterBoolean: FfiConverter<Boolean, Byte> {
+    override fun lift(value: Byte): Boolean {
+        return value.toInt() != 0
+    }
+
+    override fun read(buf: ByteBuffer): Boolean {
+        return lift(buf.get())
+    }
+
+    override fun lower(value: Boolean): Byte {
+        return if (value) 1.toByte() else 0.toByte()
+    }
+
+    override fun allocationSize(value: Boolean) = 1UL
+
+    override fun write(value: Boolean, buf: ByteBuffer) {
+        buf.put(lower(value))
     }
 }
 
@@ -1430,9 +1528,20 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 public interface FfiReaderSessionInterface {
     
     /**
+     * Add a bookmark at the current position with an optional label.
+     * Returns the newly created bookmark.
+     */
+    fun `addBookmark`(`label`: kotlin.String?): BookmarkInfo
+    
+    /**
      * HTML da página atual com CSS de tema injetado (para WebView).
      */
     fun `currentHtml`(): kotlin.String
+    
+    /**
+     * Export all bookmarks as a JSON string for persistence.
+     */
+    fun `exportBookmarksJson`(): kotlin.String
     
     /**
      * Returns the current reading position for persistence.
@@ -1445,6 +1554,21 @@ public interface FfiReaderSessionInterface {
      * Go to a specific spine item with a specific progression.
      */
     fun `goToWithProgression`(`spineIndex`: kotlin.UInt, `progression`: kotlin.Float): ReaderSnapshot
+     * Navigate to a bookmark by its ID.
+     * Returns the new state after navigation.
+     */
+    fun `goToBookmark`(`id`: kotlin.String): ReaderSnapshot
+    
+    /**
+     * Import bookmarks from a JSON string.
+     * Replaces the current bookmarks with the imported ones.
+     */
+    fun `importBookmarksJson`(`json`: kotlin.String): ReaderSnapshot
+    
+    /**
+     * List all bookmarks in this publication.
+     */
+    fun `listBookmarks`(): List<BookmarkInfo>
     
     /**
      * List all resources in the publication with their media types.
@@ -1466,6 +1590,10 @@ public interface FfiReaderSessionInterface {
      * Call this from the client when the user scrolls.
      */
     fun `reportProgression`(`progression`: kotlin.Float): ReaderSnapshot
+     * Remove a bookmark by its ID.
+     * Returns true if a bookmark was removed, false if no bookmark with that ID existed.
+     */
+    fun `removeBookmark`(`id`: kotlin.String): kotlin.Boolean
     
     /**
      * Get the media type for a resource href, if known.
@@ -1485,6 +1613,13 @@ public interface FfiReaderSessionInterface {
     fun `setThemeJson`(`json`: kotlin.String): ReaderSnapshot
     
     fun `snapshot`(): ReaderSnapshot
+    
+    /**
+     * Toggle a bookmark at the current position.
+     * If a bookmark exists at the current spine_index, removes it and returns None.
+     * Otherwise, adds a new bookmark with the given label and returns it.
+     */
+    fun `toggleBookmark`(`label`: kotlin.String?): BookmarkInfo?
     
     companion object
 }
@@ -1576,6 +1711,22 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
 
     
     /**
+     * Add a bookmark at the current position with an optional label.
+     * Returns the newly created bookmark.
+     */override fun `addBookmark`(`label`: kotlin.String?): BookmarkInfo {
+            return FfiConverterTypeBookmarkInfo.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_add_bookmark(
+        it, FfiConverterOptionalString.lower(`label`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * HTML da página atual com CSS de tema injetado (para WebView).
      */
     @Throws(ReaderFfiException::class)override fun `currentHtml`(): kotlin.String {
@@ -1583,6 +1734,21 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     callWithPointer {
     uniffiRustCallWithError(ReaderFfiException) { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_current_html(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Export all bookmarks as a JSON string for persistence.
+     */override fun `exportBookmarksJson`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_export_bookmarks_json(
         it, _status)
 }
     }
@@ -1626,6 +1792,47 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_go_to_with_progression(
         it, FfiConverterUInt.lower(`spineIndex`),FfiConverterFloat.lower(`progression`),_status)
+     * Navigate to a bookmark by its ID.
+     * Returns the new state after navigation.
+     */
+    @Throws(ReaderFfiException::class)override fun `goToBookmark`(`id`: kotlin.String): ReaderSnapshot {
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCallWithError(ReaderFfiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_go_to_bookmark(
+        it, FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Import bookmarks from a JSON string.
+     * Replaces the current bookmarks with the imported ones.
+     */
+    @Throws(ReaderFfiException::class)override fun `importBookmarksJson`(`json`: kotlin.String): ReaderSnapshot {
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCallWithError(ReaderFfiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_import_bookmarks_json(
+        it, FfiConverterString.lower(`json`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * List all bookmarks in this publication.
+     */override fun `listBookmarks`(): List<BookmarkInfo> {
+            return FfiConverterSequenceTypeBookmarkInfo.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_list_bookmarks(
+        it, _status)
 }
     }
     )
@@ -1698,6 +1905,14 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_report_progression(
         it, FfiConverterFloat.lower(`progression`),_status)
+     * Remove a bookmark by its ID.
+     * Returns true if a bookmark was removed, false if no bookmark with that ID existed.
+     */override fun `removeBookmark`(`id`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_remove_bookmark(
+        it, FfiConverterString.lower(`id`),_status)
 }
     }
     )
@@ -1768,6 +1983,23 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_snapshot(
         it, _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Toggle a bookmark at the current position.
+     * If a bookmark exists at the current spine_index, removes it and returns None.
+     * Otherwise, adds a new bookmark with the given label and returns it.
+     */override fun `toggleBookmark`(`label`: kotlin.String?): BookmarkInfo? {
+            return FfiConverterOptionalTypeBookmarkInfo.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_toggle_bookmark(
+        it, FfiConverterOptionalString.lower(`label`),_status)
 }
     }
     )
@@ -2069,6 +2301,68 @@ public object FfiConverterTypeReaderEngine: FfiConverter<ReaderEngine, Pointer> 
 
 
 /**
+ * Information about a bookmark for FFI.
+ */
+data class BookmarkInfo (
+    /**
+     * Unique identifier for this bookmark.
+     */
+    var `id`: kotlin.String, 
+    /**
+     * Spine index of the bookmarked position.
+     */
+    var `spineIndex`: kotlin.UInt, 
+    /**
+     * Progression within the spine item (0.0..=1.0).
+     */
+    var `progression`: kotlin.Float, 
+    /**
+     * Optional user-provided label.
+     */
+    var `label`: kotlin.String?, 
+    /**
+     * Timestamp when the bookmark was created (Unix millis).
+     */
+    var `createdAt`: kotlin.ULong
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeBookmarkInfo: FfiConverterRustBuffer<BookmarkInfo> {
+    override fun read(buf: ByteBuffer): BookmarkInfo {
+        return BookmarkInfo(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: BookmarkInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterUInt.allocationSize(value.`spineIndex`) +
+            FfiConverterFloat.allocationSize(value.`progression`) +
+            FfiConverterOptionalString.allocationSize(value.`label`) +
+            FfiConverterULong.allocationSize(value.`createdAt`)
+    )
+
+    override fun write(value: BookmarkInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterUInt.write(value.`spineIndex`, buf)
+            FfiConverterFloat.write(value.`progression`, buf)
+            FfiConverterOptionalString.write(value.`label`, buf)
+            FfiConverterULong.write(value.`createdAt`, buf)
+    }
+}
+
+
+
+/**
  * Snapshot do estado para a UI observar.
  */
 data class ReaderSnapshot (
@@ -2090,6 +2384,13 @@ data class ReaderSnapshot (
      * Overall book progress (0.0..=1.0).
      */
     var `bookProgress`: kotlin.Float
+     * List of all bookmarks in this publication.
+     */
+    var `bookmarks`: List<BookmarkInfo>, 
+    /**
+     * Whether there is a bookmark at the current position (same spine_index).
+     */
+    var `hasBookmarkAtCurrent`: kotlin.Boolean
 ) {
     
     companion object
@@ -2110,6 +2411,8 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterString.read(buf),
             FfiConverterFloat.read(buf),
             FfiConverterFloat.read(buf),
+            FfiConverterSequenceTypeBookmarkInfo.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -2123,6 +2426,8 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterString.allocationSize(value.`bookId`) +
             FfiConverterFloat.allocationSize(value.`chapterProgress`) +
             FfiConverterFloat.allocationSize(value.`bookProgress`)
+            FfiConverterSequenceTypeBookmarkInfo.allocationSize(value.`bookmarks`) +
+            FfiConverterBoolean.allocationSize(value.`hasBookmarkAtCurrent`)
     )
 
     override fun write(value: ReaderSnapshot, buf: ByteBuffer) {
@@ -2135,6 +2440,8 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterString.write(value.`bookId`, buf)
             FfiConverterFloat.write(value.`chapterProgress`, buf)
             FfiConverterFloat.write(value.`bookProgress`, buf)
+            FfiConverterSequenceTypeBookmarkInfo.write(value.`bookmarks`, buf)
+            FfiConverterBoolean.write(value.`hasBookmarkAtCurrent`, buf)
     }
 }
 
@@ -2263,6 +2570,22 @@ sealed class ReaderFfiException: kotlin.Exception() {
             get() = "msg=${ `msg` }"
     }
     
+    class BookmarkNotFound(
+        
+        val `id`: kotlin.String
+        ) : ReaderFfiException() {
+        override val message
+            get() = "id=${ `id` }"
+    }
+    
+    class InvalidBookmarkJson(
+        
+        val `msg`: kotlin.String
+        ) : ReaderFfiException() {
+        override val message
+            get() = "msg=${ `msg` }"
+    }
+    
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<ReaderFfiException> {
         override fun lift(error_buf: RustBuffer.ByValue): ReaderFfiException = FfiConverterTypeReaderFfiError.lift(error_buf)
@@ -2282,6 +2605,12 @@ public object FfiConverterTypeReaderFfiError : FfiConverterRustBuffer<ReaderFfiE
             1 -> ReaderFfiException.Engine(
                 FfiConverterString.read(buf),
                 )
+            2 -> ReaderFfiException.BookmarkNotFound(
+                FfiConverterString.read(buf),
+                )
+            3 -> ReaderFfiException.InvalidBookmarkJson(
+                FfiConverterString.read(buf),
+                )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
@@ -2293,6 +2622,16 @@ public object FfiConverterTypeReaderFfiError : FfiConverterRustBuffer<ReaderFfiE
                 4UL
                 + FfiConverterString.allocationSize(value.`msg`)
             )
+            is ReaderFfiException.BookmarkNotFound -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`id`)
+            )
+            is ReaderFfiException.InvalidBookmarkJson -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
         }
     }
 
@@ -2300,6 +2639,16 @@ public object FfiConverterTypeReaderFfiError : FfiConverterRustBuffer<ReaderFfiE
         when(value) {
             is ReaderFfiException.Engine -> {
                 buf.putInt(1)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is ReaderFfiException.BookmarkNotFound -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`id`, buf)
+                Unit
+            }
+            is ReaderFfiException.InvalidBookmarkJson -> {
+                buf.putInt(3)
                 FfiConverterString.write(value.`msg`, buf)
                 Unit
             }
@@ -2346,6 +2695,38 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeBookmarkInfo: FfiConverterRustBuffer<BookmarkInfo?> {
+    override fun read(buf: ByteBuffer): BookmarkInfo? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeBookmarkInfo.read(buf)
+    }
+
+    override fun allocationSize(value: BookmarkInfo?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeBookmarkInfo.allocationSize(value)
+        }
+    }
+
+    override fun write(value: BookmarkInfo?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeBookmarkInfo.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -2364,6 +2745,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeBookmarkInfo: FfiConverterRustBuffer<List<BookmarkInfo>> {
+    override fun read(buf: ByteBuffer): List<BookmarkInfo> {
+        val len = buf.getInt()
+        return List<BookmarkInfo>(len) {
+            FfiConverterTypeBookmarkInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<BookmarkInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeBookmarkInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<BookmarkInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeBookmarkInfo.write(it, buf)
         }
     }
 }

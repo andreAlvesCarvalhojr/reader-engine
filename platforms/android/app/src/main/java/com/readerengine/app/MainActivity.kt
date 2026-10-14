@@ -15,6 +15,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,12 +27,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -51,10 +66,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import uniffi.reader_ffi.BookmarkInfo
 import uniffi.reader_ffi.FfiReaderSession
 import uniffi.reader_ffi.ReaderEngine
 import uniffi.reader_ffi.ReaderSnapshot
@@ -92,6 +109,22 @@ class ReadingPositionStore(context: Context) {
             spineIndex = prefs.getInt("${bookId}_spine_index", 0).toUInt(),
             progression = prefs.getFloat("${bookId}_progression", 0f),
         )
+    }
+}
+
+/** Manages bookmark persistence using SharedPreferences (JSON export/import). */
+class BookmarkStore(context: Context) {
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("bookmarks", Context.MODE_PRIVATE)
+
+    fun save(bookId: String, bookmarksJson: String) {
+        prefs.edit()
+            .putString(bookId, bookmarksJson)
+            .apply()
+    }
+
+    fun load(bookId: String): String? {
+        return prefs.getString(bookId, null)
     }
 }
 
@@ -224,6 +257,7 @@ private fun ReaderScreen(
 ) {
     val context = LocalContext.current
     val positionStore = remember { ReadingPositionStore(context) }
+    val bookmarkStore = remember { BookmarkStore(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var session by remember { mutableStateOf<FfiReaderSession?>(null) }
@@ -234,12 +268,20 @@ private fun ReaderScreen(
     var activeSample by remember { mutableStateOf<String?>(null) }
     var bookProgress by remember { mutableFloatStateOf(0f) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var showBookmarks by remember { mutableStateOf(false) }
 
     fun saveCurrentPosition() {
         val s = session ?: return
         val snap = snapshot ?: return
         val pos = s.getPosition()
         positionStore.save(snap.bookId, pos)
+    }
+
+    fun saveBookmarks() {
+        val s = session ?: return
+        val snap = snapshot ?: return
+        val json = s.exportBookmarksJson()
+        bookmarkStore.save(snap.bookId, json)
     }
 
     fun refresh(from: FfiReaderSession, snap: ReaderSnapshot, savePosition: Boolean = true) {
@@ -262,17 +304,46 @@ private fun ReaderScreen(
     fun openBytes(name: String, bytes: ByteArray, sampleId: String?) {
         runCatching {
             saveCurrentPosition()
+            saveBookmarks()
             val opened = engine.open(name, bytes)
             var snap = opened.snapshot()
             val savedPos = positionStore.load(snap.bookId)
             if (savedPos != null) {
                 snap = opened.restorePosition(savedPos)
             }
+            val savedBookmarks = bookmarkStore.load(snap.bookId)
+            if (savedBookmarks != null) {
+                runCatching { snap = opened.importBookmarksJson(savedBookmarks) }
+            }
             refresh(opened, snap, savePosition = false)
             activeSample = sampleId
         }.onFailure {
             error = it.message ?: it.toString()
         }
+    }
+
+    fun toggleBookmark() {
+        val s = session ?: return
+        s.toggleBookmark(null)
+        snapshot = s.snapshot()
+        saveBookmarks()
+    }
+
+    fun goToBookmark(bookmark: BookmarkInfo) {
+        val s = session ?: return
+        runCatching {
+            val snap = s.goToBookmark(bookmark.id)
+            refresh(s, snap)
+        }.onFailure {
+            error = it.message ?: it.toString()
+        }
+    }
+
+    fun removeBookmark(bookmark: BookmarkInfo) {
+        val s = session ?: return
+        s.removeBookmark(bookmark.id)
+        snapshot = s.snapshot()
+        saveBookmarks()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -282,6 +353,8 @@ private fun ReaderScreen(
                     snapshot?.let { snap ->
                         val pos = s.getPosition()
                         positionStore.save(snap.bookId, pos)
+                        val bookmarksJson = s.exportBookmarksJson()
+                        bookmarkStore.save(snap.bookId, bookmarksJson)
                     }
                 }
             }
@@ -319,13 +392,24 @@ private fun ReaderScreen(
             val snap = snapshot
             val index = snap?.spineIndex?.toInt() ?: 0
             val total = snap?.spineLen?.toInt() ?: 0
+            val hasBookmark = snap?.hasBookmarkAtCurrent ?: false
             Row(
                 modifier = ComposeModifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(
+                    onClick = { toggleBookmark() },
+                    enabled = snap != null,
+                ) {
+                    Icon(
+                        imageVector = if (hasBookmark) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                        contentDescription = if (hasBookmark) "Remove bookmark" else "Add bookmark",
+                        tint = if (hasBookmark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
                 OutlinedButton(
                     onClick = { session?.let { refresh(it, it.prev()) } },
                     enabled = snap != null && index > 0,
@@ -418,6 +502,43 @@ private fun ReaderScreen(
                 },
                 valueRange = 0.8f..1.8f,
             )
+            val bookmarks = snapshot?.bookmarks ?: emptyList()
+            if (bookmarks.isNotEmpty()) {
+                Row(
+                    modifier = ComposeModifier
+                        .fillMaxWidth()
+                        .clickable { showBookmarks = !showBookmarks }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Bookmarks (${bookmarks.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = ComposeModifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = if (showBookmarks) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (showBookmarks) "Collapse" else "Expand",
+                        modifier = ComposeModifier.size(20.dp),
+                    )
+                }
+                AnimatedVisibility(visible = showBookmarks) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = ComposeModifier.fillMaxWidth(),
+                    ) {
+                        items(bookmarks, key = { it.id }) { bookmark ->
+                            BookmarkChip(
+                                bookmark = bookmark,
+                                isCurrentPage = bookmark.spineIndex == (snapshot?.spineIndex ?: 0u),
+                                onClick = { goToBookmark(bookmark) },
+                                onRemove = { removeBookmark(bookmark) },
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = ComposeModifier.height(4.dp))
+            }
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
                 Spacer(modifier = ComposeModifier.height(8.dp))
@@ -462,4 +583,43 @@ private fun ReaderScreen(
             )
         }
     }
+}
+
+@Composable
+private fun BookmarkChip(
+    bookmark: BookmarkInfo,
+    isCurrentPage: Boolean,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    AssistChip(
+        onClick = onClick,
+        label = {
+            Text(
+                text = bookmark.label ?: "Page ${bookmark.spineIndex.toInt() + 1}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Bookmark,
+                contentDescription = null,
+                modifier = ComposeModifier.size(18.dp),
+                tint = if (isCurrentPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingIcon = {
+            IconButton(
+                onClick = onRemove,
+                modifier = ComposeModifier.size(18.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Remove bookmark",
+                    modifier = ComposeModifier.size(14.dp),
+                )
+            }
+        },
+    )
 }

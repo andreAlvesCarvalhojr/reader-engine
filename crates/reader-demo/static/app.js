@@ -8,6 +8,9 @@ const progress = document.getElementById("progress");
 const subtitle = document.getElementById("subtitle");
 const theme = document.getElementById("theme");
 const scale = document.getElementById("scale");
+const bookmarkToggle = document.getElementById("bookmark-toggle");
+const bookmarksBar = document.getElementById("bookmarks-bar");
+const bookmarksList = document.getElementById("bookmarks-list");
 
 let current = null;
 let scrollTimeout = null;
@@ -142,6 +145,35 @@ function formatProgress(value) {
   return `${Math.round(value * 100)}%`;
 }
 
+function renderBookmarks(state) {
+  bookmarksList.innerHTML = "";
+  const bookmarks = state.bookmarks || [];
+  if (bookmarks.length === 0) {
+    bookmarksBar.hidden = true;
+    return;
+  }
+  bookmarksBar.hidden = false;
+  for (const bm of bookmarks) {
+    const chip = document.createElement("div");
+    chip.className = "bookmark-chip";
+    if (bm.spine_index === state.spine_index) {
+      chip.classList.add("current");
+    }
+    chip.innerHTML = `
+      <span class="bookmark-label">${bm.label || `Page ${bm.spine_index + 1}`}</span>
+      <button type="button" class="remove-btn" title="Remove bookmark">×</button>
+    `;
+    chip.querySelector(".bookmark-label").addEventListener("click", () => {
+      command({ type: "go_to_bookmark", id: bm.id });
+    });
+    chip.querySelector(".remove-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      command({ type: "remove_bookmark", id: bm.id });
+    });
+    bookmarksList.appendChild(chip);
+  }
+}
+
 function paintState(state) {
   current = state;
   stage.hidden = false;
@@ -157,10 +189,14 @@ function paintState(state) {
   
   prev.disabled = !state.spine_len || state.spine_index <= 0;
   next.disabled = !state.spine_len || state.spine_index >= state.spine_len - 1;
+  bookmarkToggle.disabled = !state.spine_len;
+  bookmarkToggle.textContent = state.has_bookmark_at_current ? "★" : "☆";
+  bookmarkToggle.classList.toggle("active", state.has_bookmark_at_current);
   theme.value = state.theme || "material3";
   scale.value = String(state.font_scale ?? 1);
   lastReportedProgression = state.chapter_progress ?? 0;
   renderToc(state);
+  renderBookmarks(state);
 }
 
 async function openBook(id) {
@@ -183,6 +219,7 @@ async function command(body) {
 
 prev.addEventListener("click", () => command({ type: "prev" }));
 next.addEventListener("click", () => command({ type: "next" }));
+bookmarkToggle.addEventListener("click", () => command({ type: "toggle_bookmark", label: null }));
 theme.addEventListener("change", () => command({ type: "set_theme", theme: theme.value }));
 scale.addEventListener("change", () =>
   command({ type: "set_font_scale", scale: Number(scale.value) }),
@@ -191,6 +228,7 @@ scale.addEventListener("change", () =>
 document.addEventListener("keydown", (event) => {
   if (event.key === "ArrowRight") command({ type: "next" });
   if (event.key === "ArrowLeft") command({ type: "prev" });
+  if (event.key === "b" || event.key === "B") command({ type: "toggle_bookmark", label: null });
 });
 
 const books = await api("/api/books");

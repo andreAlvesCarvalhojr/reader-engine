@@ -14,5 +14,5 @@ pub use error::{Error, Result};
 pub use model::*;
 pub use parser::{FormatParser, Source};
 pub use registry::Registry;
-pub use session::{Command, ReaderSession, ReaderState};
+pub use session::{BookmarkError, Command, ReaderSession, ReaderState};
 pub use theme::{DesignSystem, ThemeTokens};
