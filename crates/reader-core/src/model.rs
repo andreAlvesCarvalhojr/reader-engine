@@ -32,6 +32,19 @@ pub struct Locator {
     pub progression: f32,
 }
 
+/// A bookmark marking a specific position in the publication.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Bookmark {
+    /// Unique identifier for this bookmark.
+    pub id: String,
+    /// The position this bookmark refers to.
+    pub locator: Locator,
+    /// Optional user-provided label/name for the bookmark.
+    pub label: Option<String>,
+    /// Timestamp when the bookmark was created (Unix millis).
+    pub created_at: u64,
+}
+
 /// Acesso lazy aos bytes dos recursos (zip, disco, memória...).
 pub trait ResourceProvider: Send + Sync {
     fn read(&self, href: &str) -> Result<Vec<u8>>;

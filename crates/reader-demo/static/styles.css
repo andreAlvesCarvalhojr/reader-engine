@@ -300,6 +300,78 @@ main {
   white-space: nowrap;
 }
 
+.bookmark-btn {
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0 12px;
+}
+
+.bookmark-btn.active {
+  color: var(--accent);
+}
+
+.bookmarks-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.bookmarks-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--danger-mute);
+  white-space: nowrap;
+}
+
+.bookmarks-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.bookmark-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(62, 207, 172, 0.1);
+  color: var(--mist);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 140ms ease;
+  white-space: nowrap;
+}
+
+.bookmark-chip:hover {
+  background: rgba(62, 207, 172, 0.2);
+}
+
+.bookmark-chip.current {
+  border-color: var(--accent);
+}
+
+.bookmark-chip .remove-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--danger-mute);
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.bookmark-chip .remove-btn:hover {
+  color: var(--mist);
+}
+
 @media (max-width: 720px) {
   .stage {
     grid-template-columns: 1fr;

@@ -46,10 +46,15 @@
     </main>
 
     <nav class="chrome" aria-label="Navegação do leitor">
+      <button type="button" id="bookmark-toggle" class="nav-btn bookmark-btn" disabled aria-label="Toggle bookmark" title="Add/Remove bookmark">☆</button>
       <button type="button" id="prev" class="nav-btn" disabled aria-label="Página anterior">Anterior</button>
       <p class="progress" id="progress" aria-live="polite">—</p>
       <button type="button" id="next" class="nav-btn primary" disabled aria-label="Próxima página">Próxima</button>
     </nav>
+    <section class="bookmarks-bar" id="bookmarks-bar" hidden aria-label="Bookmarks">
+      <span class="bookmarks-label">Bookmarks:</span>
+      <div class="bookmarks-list" id="bookmarks-list"></div>
+    </section>
 
     <script src="/app.js" type="module"></script>
   </body>

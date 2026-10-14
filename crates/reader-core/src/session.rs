@@ -1,5 +1,15 @@
-use crate::model::{Locator, Publication};
+use crate::model::{Bookmark, Locator, Publication};
 use crate::theme::ThemeTokens;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Error type for bookmark operations.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum BookmarkError {
+    #[error("Bookmark not found: {0}")]
+    NotFound(String),
+    #[error("Invalid bookmark JSON: {0}")]
+    InvalidJson(String),
+}
 
 #[derive(Debug, Clone)]
 pub enum Command {
@@ -19,11 +29,26 @@ pub struct ReaderState {
     pub theme: ThemeTokens,
     pub font_scale: f32,
     pub spine_len: usize,
+    pub bookmarks: Vec<Bookmark>,
 }
 
 pub struct ReaderSession {
     publication: Publication,
     state: ReaderState,
+}
+
+fn generate_bookmark_id() -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("bm-{}-{}", now.as_millis(), now.subsec_nanos())
+}
+
+fn current_timestamp_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 impl ReaderSession {
@@ -33,6 +58,7 @@ impl ReaderSession {
             theme,
             font_scale: 1.0,
             spine_len: publication.spine.len(),
+            bookmarks: Vec::new(),
         };
         Self { publication, state }
     }
@@ -88,6 +114,86 @@ impl ReaderSession {
         let completed = self.state.locator.spine_index as f32;
         let current = self.state.locator.progression;
         (completed + current) / self.state.spine_len as f32
+    }
+
+    /// Adds a bookmark at the current position with an optional label.
+    /// Returns the newly created bookmark.
+    pub fn add_bookmark(&mut self, label: Option<String>) -> Bookmark {
+        let bookmark = Bookmark {
+            id: generate_bookmark_id(),
+            locator: self.state.locator.clone(),
+            label,
+            created_at: current_timestamp_millis(),
+        };
+        self.state.bookmarks.push(bookmark.clone());
+        bookmark
+    }
+
+    /// Removes a bookmark by its ID. Returns true if a bookmark was removed.
+    pub fn remove_bookmark(&mut self, id: &str) -> bool {
+        let initial_len = self.state.bookmarks.len();
+        self.state.bookmarks.retain(|b| b.id != id);
+        self.state.bookmarks.len() < initial_len
+    }
+
+    /// Returns a reference to all bookmarks.
+    pub fn list_bookmarks(&self) -> &[Bookmark] {
+        &self.state.bookmarks
+    }
+
+    /// Navigates to a bookmark by its ID.
+    /// Returns the new state, or an error if the bookmark is not found.
+    pub fn go_to_bookmark(&mut self, id: &str) -> Result<&ReaderState, BookmarkError> {
+        let bookmark = self
+            .state
+            .bookmarks
+            .iter()
+            .find(|b| b.id == id)
+            .ok_or_else(|| BookmarkError::NotFound(id.to_string()))?;
+        let locator = bookmark.locator.clone();
+        self.dispatch(Command::GoTo(locator));
+        Ok(&self.state)
+    }
+
+    /// Exports all bookmarks as a JSON string for persistence.
+    pub fn export_bookmarks_json(&self) -> String {
+        serde_json::to_string(&self.state.bookmarks).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Imports bookmarks from a JSON string.
+    /// Replaces the current bookmarks with the imported ones.
+    pub fn import_bookmarks_json(&mut self, json: &str) -> Result<(), BookmarkError> {
+        let bookmarks: Vec<Bookmark> =
+            serde_json::from_str(json).map_err(|e| BookmarkError::InvalidJson(e.to_string()))?;
+        self.state.bookmarks = bookmarks;
+        Ok(())
+    }
+
+    /// Checks if there is a bookmark at the current position (same spine_index).
+    pub fn has_bookmark_at_current(&self) -> Option<&Bookmark> {
+        self.state
+            .bookmarks
+            .iter()
+            .find(|b| b.locator.spine_index == self.state.locator.spine_index)
+    }
+
+    /// Toggles a bookmark at the current position.
+    /// If a bookmark exists at this spine_index, removes it and returns None.
+    /// Otherwise, adds a new bookmark with the given label and returns it.
+    pub fn toggle_bookmark(&mut self, label: Option<String>) -> Option<Bookmark> {
+        let existing_id = self
+            .state
+            .bookmarks
+            .iter()
+            .find(|b| b.locator.spine_index == self.state.locator.spine_index)
+            .map(|b| b.id.clone());
+
+        if let Some(id) = existing_id {
+            self.remove_bookmark(&id);
+            None
+        } else {
+            Some(self.add_bookmark(label))
+        }
     }
 }
 
@@ -350,5 +456,184 @@ mod tests {
         s.dispatch(Command::Prev);
         assert_eq!(s.state().locator.spine_index, 0);
         assert!((s.state().locator.progression - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn add_bookmark_at_current_position() {
+        let mut s = ReaderSession::new(pub_with_pages(5), theme());
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 2,
+            progression: 0.5,
+        }));
+
+        let bookmark = s.add_bookmark(Some("My bookmark".to_string()));
+        assert_eq!(bookmark.locator.spine_index, 2);
+        assert!((bookmark.locator.progression - 0.5).abs() < f32::EPSILON);
+        assert_eq!(bookmark.label, Some("My bookmark".to_string()));
+        assert!(bookmark.created_at > 0);
+        assert!(!bookmark.id.is_empty());
+    }
+
+    #[test]
+    fn add_bookmark_without_label() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        let bookmark = s.add_bookmark(None);
+        assert_eq!(bookmark.label, None);
+        assert_eq!(bookmark.locator.spine_index, 0);
+    }
+
+    #[test]
+    fn list_bookmarks_returns_all() {
+        let mut s = ReaderSession::new(pub_with_pages(5), theme());
+        s.add_bookmark(Some("First".to_string()));
+        s.dispatch(Command::Next);
+        s.add_bookmark(Some("Second".to_string()));
+        s.dispatch(Command::Next);
+        s.add_bookmark(None);
+
+        let bookmarks = s.list_bookmarks();
+        assert_eq!(bookmarks.len(), 3);
+        assert_eq!(bookmarks[0].label, Some("First".to_string()));
+        assert_eq!(bookmarks[1].label, Some("Second".to_string()));
+        assert_eq!(bookmarks[2].label, None);
+    }
+
+    #[test]
+    fn remove_bookmark_by_id() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        let bm1 = s.add_bookmark(Some("First".to_string()));
+        s.dispatch(Command::Next);
+        let _bm2 = s.add_bookmark(Some("Second".to_string()));
+
+        assert_eq!(s.list_bookmarks().len(), 2);
+        let removed = s.remove_bookmark(&bm1.id);
+        assert!(removed);
+        assert_eq!(s.list_bookmarks().len(), 1);
+        assert_eq!(s.list_bookmarks()[0].label, Some("Second".to_string()));
+    }
+
+    #[test]
+    fn remove_nonexistent_bookmark_returns_false() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.add_bookmark(Some("First".to_string()));
+        let removed = s.remove_bookmark("nonexistent-id");
+        assert!(!removed);
+        assert_eq!(s.list_bookmarks().len(), 1);
+    }
+
+    #[test]
+    fn go_to_bookmark_navigates() {
+        let mut s = ReaderSession::new(pub_with_pages(5), theme());
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 3,
+            progression: 0.75,
+        }));
+        let bookmark = s.add_bookmark(Some("Chapter 3".to_string()));
+
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 0,
+            progression: 0.0,
+        }));
+        assert_eq!(s.state().locator.spine_index, 0);
+
+        let state = s.go_to_bookmark(&bookmark.id).unwrap();
+        assert_eq!(state.locator.spine_index, 3);
+        assert!((state.locator.progression - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn go_to_nonexistent_bookmark_returns_error() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        let result = s.go_to_bookmark("nonexistent-id");
+        assert!(result.is_err());
+        assert!(matches!(result, Err(BookmarkError::NotFound(_))));
+    }
+
+    #[test]
+    fn export_and_import_bookmarks_json() {
+        let mut s1 = ReaderSession::new(pub_with_pages(5), theme());
+        s1.add_bookmark(Some("Chapter 1".to_string()));
+        s1.dispatch(Command::GoTo(Locator {
+            spine_index: 2,
+            progression: 0.5,
+        }));
+        s1.add_bookmark(None);
+
+        let json = s1.export_bookmarks_json();
+        assert!(json.contains("Chapter 1"));
+
+        let mut s2 = ReaderSession::new(pub_with_pages(5), theme());
+        assert!(s2.list_bookmarks().is_empty());
+        s2.import_bookmarks_json(&json).unwrap();
+        assert_eq!(s2.list_bookmarks().len(), 2);
+        assert_eq!(s2.list_bookmarks()[0].label, Some("Chapter 1".to_string()));
+    }
+
+    #[test]
+    fn import_invalid_json_returns_error() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        let result = s.import_bookmarks_json("not valid json");
+        assert!(result.is_err());
+        assert!(matches!(result, Err(BookmarkError::InvalidJson(_))));
+    }
+
+    #[test]
+    fn has_bookmark_at_current_returns_bookmark() {
+        let mut s = ReaderSession::new(pub_with_pages(5), theme());
+        assert!(s.has_bookmark_at_current().is_none());
+
+        let bm = s.add_bookmark(Some("Here".to_string()));
+        let found = s.has_bookmark_at_current();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, bm.id);
+
+        s.dispatch(Command::Next);
+        assert!(s.has_bookmark_at_current().is_none());
+    }
+
+    #[test]
+    fn toggle_bookmark_adds_when_none() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        assert!(s.has_bookmark_at_current().is_none());
+
+        let result = s.toggle_bookmark(Some("Toggled".to_string()));
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().label, Some("Toggled".to_string()));
+        assert!(s.has_bookmark_at_current().is_some());
+    }
+
+    #[test]
+    fn toggle_bookmark_removes_when_exists() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.add_bookmark(Some("Existing".to_string()));
+        assert!(s.has_bookmark_at_current().is_some());
+
+        let result = s.toggle_bookmark(None);
+        assert!(result.is_none());
+        assert!(s.has_bookmark_at_current().is_none());
+    }
+
+    #[test]
+    fn bookmarks_included_in_state() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        assert!(s.state().bookmarks.is_empty());
+
+        s.add_bookmark(Some("Test".to_string()));
+        assert_eq!(s.state().bookmarks.len(), 1);
+        assert_eq!(s.state().bookmarks[0].label, Some("Test".to_string()));
+    }
+
+    #[test]
+    fn bookmark_can_be_serialized() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        let bm = s.add_bookmark(Some("Test".to_string()));
+
+        let json = serde_json::to_string(&bm).expect("serialize bookmark");
+        let restored: crate::model::Bookmark =
+            serde_json::from_str(&json).expect("deserialize bookmark");
+
+        assert_eq!(restored.id, bm.id);
+        assert_eq!(restored.label, bm.label);
+        assert_eq!(restored.locator.spine_index, bm.locator.spine_index);
     }
 }

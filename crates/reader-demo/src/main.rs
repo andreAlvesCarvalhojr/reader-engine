@@ -30,6 +30,15 @@ struct BookInfo {
 }
 
 #[derive(Serialize)]
+struct BookmarkDto {
+    id: String,
+    spine_index: usize,
+    progression: f32,
+    label: Option<String>,
+    created_at: u64,
+}
+
+#[derive(Serialize)]
 struct StateDto {
     book_id: Option<String>,
     title: Option<String>,
@@ -44,6 +53,8 @@ struct StateDto {
     chapter_progress: f32,
     /// Overall book progress (0.0..=1.0).
     book_progress: f32,
+    bookmarks: Vec<BookmarkDto>,
+    has_bookmark_at_current: bool,
 }
 
 #[derive(Serialize)]
@@ -77,6 +88,15 @@ enum CmdBody {
     },
     ReportProgression {
         progression: f32,
+    },
+    ToggleBookmark {
+        label: Option<String>,
+    },
+    RemoveBookmark {
+        id: String,
+    },
+    GoToBookmark {
+        id: String,
     },
 }
 
@@ -172,6 +192,18 @@ fn state_dto(book_id: Option<String>, session: &ReaderSession) -> StateDto {
             .get(st.locator.spine_index)
             .map(|t| t.title.clone())
     });
+    let bookmarks = st
+        .bookmarks
+        .iter()
+        .map(|b| BookmarkDto {
+            id: b.id.clone(),
+            spine_index: b.locator.spine_index,
+            progression: b.locator.progression,
+            label: b.label.clone(),
+            created_at: b.created_at,
+        })
+        .collect();
+    let has_bookmark_at_current = session.has_bookmark_at_current().is_some();
     StateDto {
         book_id,
         title: Some(pub_.metadata.title.clone()),
@@ -184,6 +216,8 @@ fn state_dto(book_id: Option<String>, session: &ReaderSession) -> StateDto {
         page_label,
         chapter_progress: session.chapter_progress(),
         book_progress: session.book_progress(),
+        bookmarks,
+        has_bookmark_at_current,
     }
 }
 
@@ -273,6 +307,17 @@ async fn command(
         }
         CmdBody::ReportProgression { progression } => {
             session.dispatch(Command::ReportProgression(progression));
+        }
+        CmdBody::ToggleBookmark { label } => {
+            session.toggle_bookmark(label);
+        }
+        CmdBody::RemoveBookmark { id } => {
+            session.remove_bookmark(&id);
+        }
+        CmdBody::GoToBookmark { id } => {
+            session
+                .go_to_bookmark(&id)
+                .map_err(|_| StatusCode::NOT_FOUND)?;
         }
     }
     let book_id = state.book_id.lock().unwrap().clone();

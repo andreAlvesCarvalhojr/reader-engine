@@ -5,7 +5,9 @@
 
 uniffi::setup_scaffolding!();
 
-use reader_core::{Command, Locator, ReaderSession, Registry, Source, ThemeTokens};
+use reader_core::{
+    Bookmark, BookmarkError, Command, Locator, ReaderSession, Registry, Source, ThemeTokens,
+};
 use reader_epub::EpubParser;
 use reader_hpub::HpubParser;
 use reader_json::JsonParser;
@@ -16,12 +18,25 @@ use std::sync::{Arc, Mutex};
 pub enum ReaderFfiError {
     #[error("{msg}")]
     Engine { msg: String },
+    #[error("Bookmark not found: {id}")]
+    BookmarkNotFound { id: String },
+    #[error("Invalid bookmark JSON: {msg}")]
+    InvalidBookmarkJson { msg: String },
 }
 
 impl From<reader_core::Error> for ReaderFfiError {
     fn from(value: reader_core::Error) -> Self {
         Self::Engine {
             msg: value.to_string(),
+        }
+    }
+}
+
+impl From<BookmarkError> for ReaderFfiError {
+    fn from(value: BookmarkError) -> Self {
+        match value {
+            BookmarkError::NotFound(id) => Self::BookmarkNotFound { id },
+            BookmarkError::InvalidJson(msg) => Self::InvalidBookmarkJson { msg },
         }
     }
 }
@@ -48,6 +63,39 @@ pub struct ResourceInfo {
     pub media_type: String,
 }
 
+/// Information about a bookmark for FFI.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct BookmarkInfo {
+    /// Unique identifier for this bookmark.
+    pub id: String,
+    /// Spine index of the bookmarked position.
+    pub spine_index: u32,
+    /// Progression within the spine item (0.0..=1.0).
+    pub progression: f32,
+    /// Optional user-provided label.
+    pub label: Option<String>,
+    /// Timestamp when the bookmark was created (Unix millis).
+    pub created_at: u64,
+}
+
+impl From<&Bookmark> for BookmarkInfo {
+    fn from(b: &Bookmark) -> Self {
+        BookmarkInfo {
+            id: b.id.clone(),
+            spine_index: b.locator.spine_index as u32,
+            progression: b.locator.progression,
+            label: b.label.clone(),
+            created_at: b.created_at,
+        }
+    }
+}
+
+impl From<Bookmark> for BookmarkInfo {
+    fn from(b: Bookmark) -> Self {
+        BookmarkInfo::from(&b)
+    }
+}
+
 /// Snapshot do estado para a UI observar.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct ReaderSnapshot {
@@ -63,6 +111,10 @@ pub struct ReaderSnapshot {
     pub chapter_progress: f32,
     /// Overall book progress (0.0..=1.0).
     pub book_progress: f32,
+    /// List of all bookmarks in this publication.
+    pub bookmarks: Vec<BookmarkInfo>,
+    /// Whether there is a bookmark at the current position (same spine_index).
+    pub has_bookmark_at_current: bool,
 }
 
 fn default_registry() -> Registry {
@@ -164,6 +216,8 @@ fn snapshot_of(session: &ReaderSession) -> ReaderSnapshot {
             })
         })
         .collect();
+    let bookmarks: Vec<BookmarkInfo> = st.bookmarks.iter().map(BookmarkInfo::from).collect();
+    let has_bookmark_at_current = session.has_bookmark_at_current().is_some();
     ReaderSnapshot {
         title: pub_.metadata.title.clone(),
         authors: pub_.metadata.authors.clone(),
@@ -174,6 +228,8 @@ fn snapshot_of(session: &ReaderSession) -> ReaderSnapshot {
         book_id: book_id_of(session),
         chapter_progress: session.chapter_progress(),
         book_progress: session.book_progress(),
+        bookmarks,
+        has_bookmark_at_current,
     }
 }
 
@@ -335,6 +391,56 @@ impl FfiReaderSession {
             .find(|r| r.href == href)
             .map(|r| r.media_type.clone())
     }
+
+    /// Add a bookmark at the current position with an optional label.
+    /// Returns the newly created bookmark.
+    pub fn add_bookmark(&self, label: Option<String>) -> BookmarkInfo {
+        let mut g = self.inner.lock().expect("session lock");
+        g.add_bookmark(label).into()
+    }
+
+    /// Remove a bookmark by its ID.
+    /// Returns true if a bookmark was removed, false if no bookmark with that ID existed.
+    pub fn remove_bookmark(&self, id: String) -> bool {
+        let mut g = self.inner.lock().expect("session lock");
+        g.remove_bookmark(&id)
+    }
+
+    /// List all bookmarks in this publication.
+    pub fn list_bookmarks(&self) -> Vec<BookmarkInfo> {
+        let g = self.inner.lock().expect("session lock");
+        g.list_bookmarks().iter().map(BookmarkInfo::from).collect()
+    }
+
+    /// Navigate to a bookmark by its ID.
+    /// Returns the new state after navigation.
+    pub fn go_to_bookmark(&self, id: String) -> Result<ReaderSnapshot, ReaderFfiError> {
+        let mut g = self.inner.lock().expect("session lock");
+        g.go_to_bookmark(&id)?;
+        Ok(snapshot_of(&g))
+    }
+
+    /// Toggle a bookmark at the current position.
+    /// If a bookmark exists at the current spine_index, removes it and returns None.
+    /// Otherwise, adds a new bookmark with the given label and returns it.
+    pub fn toggle_bookmark(&self, label: Option<String>) -> Option<BookmarkInfo> {
+        let mut g = self.inner.lock().expect("session lock");
+        g.toggle_bookmark(label).map(BookmarkInfo::from)
+    }
+
+    /// Export all bookmarks as a JSON string for persistence.
+    pub fn export_bookmarks_json(&self) -> String {
+        let g = self.inner.lock().expect("session lock");
+        g.export_bookmarks_json()
+    }
+
+    /// Import bookmarks from a JSON string.
+    /// Replaces the current bookmarks with the imported ones.
+    pub fn import_bookmarks_json(&self, json: String) -> Result<ReaderSnapshot, ReaderFfiError> {
+        let mut g = self.inner.lock().expect("session lock");
+        g.import_bookmarks_json(&json)?;
+        Ok(snapshot_of(&g))
+    }
 }
 
 #[cfg(test)]
@@ -493,6 +599,35 @@ mod tests {
     }
 
     #[test]
+    fn add_and_list_bookmarks() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let snap = session.snapshot();
+        assert!(snap.bookmarks.is_empty());
+        assert!(!snap.has_bookmark_at_current);
+
+        let bm = session.add_bookmark(Some("First bookmark".into()));
+        assert_eq!(bm.spine_index, 0);
+        assert_eq!(bm.label, Some("First bookmark".into()));
+        assert!(!bm.id.is_empty());
+
+        session.next();
+        let bm2 = session.add_bookmark(None);
+        assert_eq!(bm2.spine_index, 1);
+        assert_eq!(bm2.label, None);
+
+        let bookmarks = session.list_bookmarks();
+        assert_eq!(bookmarks.len(), 2);
+
+        let snap = session.snapshot();
+        assert_eq!(snap.bookmarks.len(), 2);
+    }
+
+    #[test]
     fn report_progression_updates_snapshot() {
         let engine = ReaderEngine::new();
         let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
@@ -592,5 +727,115 @@ mod tests {
 
         assert_eq!(pos.spine_index, 1);
         assert!((pos.progression - 0.42).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn remove_bookmark() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let bm = session.add_bookmark(Some("To remove".into()));
+        assert_eq!(session.list_bookmarks().len(), 1);
+
+        let removed = session.remove_bookmark(bm.id);
+        assert!(removed);
+        assert!(session.list_bookmarks().is_empty());
+
+        let removed_again = session.remove_bookmark("nonexistent".into());
+        assert!(!removed_again);
+    }
+
+    #[test]
+    fn go_to_bookmark_navigates() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        session.next();
+        session.next();
+        let bm = session.add_bookmark(Some("Chapter 3".into()));
+        assert_eq!(session.snapshot().spine_index, 2);
+
+        session.prev();
+        session.prev();
+        assert_eq!(session.snapshot().spine_index, 0);
+
+        let snap = session.go_to_bookmark(bm.id).expect("go to bookmark");
+        assert_eq!(snap.spine_index, 2);
+    }
+
+    #[test]
+    fn go_to_nonexistent_bookmark_returns_error() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let result = session.go_to_bookmark("nonexistent".into());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn toggle_bookmark() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        assert!(!session.snapshot().has_bookmark_at_current);
+
+        let result = session.toggle_bookmark(Some("Toggled".into()));
+        assert!(result.is_some());
+        assert!(session.snapshot().has_bookmark_at_current);
+        assert_eq!(session.list_bookmarks().len(), 1);
+
+        let result = session.toggle_bookmark(None);
+        assert!(result.is_none());
+        assert!(!session.snapshot().has_bookmark_at_current);
+        assert!(session.list_bookmarks().is_empty());
+    }
+
+    #[test]
+    fn export_and_import_bookmarks_json() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+
+        let session1 = engine
+            .open("noite-clara.json".into(), bytes.clone())
+            .expect("open json");
+        session1.add_bookmark(Some("First".into()));
+        session1.next();
+        session1.add_bookmark(Some("Second".into()));
+        let json = session1.export_bookmarks_json();
+
+        let session2 = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+        assert!(session2.list_bookmarks().is_empty());
+
+        let snap = session2
+            .import_bookmarks_json(json)
+            .expect("import bookmarks");
+        assert_eq!(snap.bookmarks.len(), 2);
+        assert_eq!(session2.list_bookmarks().len(), 2);
+    }
+
+    #[test]
+    fn import_invalid_json_returns_error() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let result = session.import_bookmarks_json("not valid json".into());
+        assert!(result.is_err());
     }
 }
