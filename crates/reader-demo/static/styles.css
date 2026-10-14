@@ -203,12 +203,119 @@ main {
   }
 }
 
-.toc {
+.sidebar {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   padding: 10px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.search-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.search-field {
+  display: flex;
+  gap: 4px;
+}
+
+.search-field input {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--mist);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.search-field input::placeholder {
+  color: var(--danger-mute);
+}
+
+.search-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search-field button {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  min-width: 40px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.search-field button:hover {
+  background: rgba(62, 207, 172, 0.14);
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.search-results li {
+  display: block;
+}
+
+.search-results button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--mist);
+  text-align: left;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.search-results button:hover,
+.search-results button:focus-visible {
+  background: rgba(62, 207, 172, 0.14);
+  outline: none;
+}
+
+.search-results .snippet {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--danger-mute);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-results .chapter {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.search-results:empty::before {
+  content: "";
+}
+
+.toc {
   display: grid;
   gap: 4px;
   align-content: start;
@@ -306,11 +413,25 @@ main {
     height: min(62dvh, 640px);
   }
 
+  .sidebar {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .search-panel {
+    grid-column: 1 / -1;
+  }
+
+  .search-results {
+    max-height: 100px;
+  }
+
   .toc {
     display: flex;
     gap: 6px;
     overflow-x: auto;
-    padding: 8px;
+    padding: 0;
+    grid-column: 1 / -1;
   }
 
   .toc button {

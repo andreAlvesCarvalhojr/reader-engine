@@ -746,6 +746,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -778,6 +780,8 @@ fun uniffi_reader_ffi_checksum_method_ffireadersession_read_resource(
 fun uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_restore_position(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_search(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale(
 ): Short
@@ -859,6 +863,8 @@ fun uniffi_reader_ffi_fn_method_ffireadersession_read_resource(`ptr`: Pointer,`h
 fun uniffi_reader_ffi_fn_method_ffireadersession_resource_media_type(`ptr`: Pointer,`href`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_restore_position(`ptr`: Pointer,`position`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_search(`ptr`: Pointer,`query`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(`ptr`: Pointer,`scale`: Float,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -1025,6 +1031,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_restore_position() != 64462.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_search() != 22843.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale() != 10257.toShort()) {
@@ -1448,6 +1457,19 @@ public interface FfiReaderSessionInterface {
      */
     fun `restorePosition`(`position`: SavedPosition): ReaderSnapshot
     
+    /**
+     * Searches for `query` across all spine items.
+     *
+     * Returns results with spine index, approximate progression within each chapter,
+     * and a snippet of text around each match. Search is case-insensitive and
+     * accent-insensitive (works well for Portuguese content with accents like
+     * "lição" matching "licao").
+     *
+     * To navigate to a result, use `restore_position` with a `SavedPosition`
+     * containing the result's `spine_index` and `progression`.
+     */
+    fun `search`(`query`: kotlin.String): List<SearchResultItem>
+    
     fun `setFontScale`(`scale`: kotlin.Float): ReaderSnapshot
     
     /**
@@ -1668,6 +1690,29 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_restore_position(
         it, FfiConverterTypeSavedPosition.lower(`position`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Searches for `query` across all spine items.
+     *
+     * Returns results with spine index, approximate progression within each chapter,
+     * and a snippet of text around each match. Search is case-insensitive and
+     * accent-insensitive (works well for Portuguese content with accents like
+     * "lição" matching "licao").
+     *
+     * To navigate to a result, use `restore_position` with a `SavedPosition`
+     * containing the result's `spine_index` and `progression`.
+     */override fun `search`(`query`: kotlin.String): List<SearchResultItem> {
+            return FfiConverterSequenceTypeSearchResultItem.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_search(
+        it, FfiConverterString.lower(`query`),_status)
 }
     }
     )
@@ -2140,6 +2185,61 @@ public object FfiConverterTypeSavedPosition: FfiConverterRustBuffer<SavedPositio
 
 
 /**
+ * A search result with location and context snippet.
+ */
+data class SearchResultItem (
+    /**
+     * Index of the spine item containing this match.
+     */
+    var `spineIndex`: kotlin.UInt, 
+    /**
+     * Approximate progression (0.0..=1.0) within the spine item.
+     */
+    var `progression`: kotlin.Float, 
+    /**
+     * Short snippet of text around the match.
+     */
+    var `snippet`: kotlin.String, 
+    /**
+     * The href of the spine item.
+     */
+    var `href`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSearchResultItem: FfiConverterRustBuffer<SearchResultItem> {
+    override fun read(buf: ByteBuffer): SearchResultItem {
+        return SearchResultItem(
+            FfiConverterUInt.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SearchResultItem) = (
+            FfiConverterUInt.allocationSize(value.`spineIndex`) +
+            FfiConverterFloat.allocationSize(value.`progression`) +
+            FfiConverterString.allocationSize(value.`snippet`) +
+            FfiConverterString.allocationSize(value.`href`)
+    )
+
+    override fun write(value: SearchResultItem, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`spineIndex`, buf)
+            FfiConverterFloat.write(value.`progression`, buf)
+            FfiConverterString.write(value.`snippet`, buf)
+            FfiConverterString.write(value.`href`, buf)
+    }
+}
+
+
+
+/**
  * Item do sumário com índice no spine.
  */
 data class TocItem (
@@ -2318,6 +2418,34 @@ public object FfiConverterSequenceTypeResourceInfo: FfiConverterRustBuffer<List<
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeResourceInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSearchResultItem: FfiConverterRustBuffer<List<SearchResultItem>> {
+    override fun read(buf: ByteBuffer): List<SearchResultItem> {
+        val len = buf.getInt()
+        return List<SearchResultItem>(len) {
+            FfiConverterTypeSearchResultItem.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SearchResultItem>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSearchResultItem.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SearchResultItem>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSearchResultItem.write(it, buf)
         }
     }
 }

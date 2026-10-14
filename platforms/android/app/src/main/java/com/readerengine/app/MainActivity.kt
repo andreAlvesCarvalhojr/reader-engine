@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,12 +25,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -56,6 +66,7 @@ import uniffi.reader_ffi.FfiReaderSession
 import uniffi.reader_ffi.ReaderEngine
 import uniffi.reader_ffi.ReaderSnapshot
 import uniffi.reader_ffi.SavedPosition
+import uniffi.reader_ffi.SearchResultItem
 import java.io.ByteArrayInputStream
 import androidx.compose.ui.Modifier as ComposeModifier
 
@@ -219,6 +230,9 @@ private fun ReaderScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var fontScale by remember { mutableFloatStateOf(1f) }
     var activeSample by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SearchResultItem>>(emptyList()) }
+    var isSearchExpanded by remember { mutableStateOf(false) }
 
     fun saveCurrentPosition() {
         val s = session ?: return
@@ -247,9 +261,32 @@ private fun ReaderScreen(
             }
             refresh(opened, snap, savePosition = false)
             activeSample = sampleId
+            searchQuery = ""
+            searchResults = emptyList()
         }.onFailure {
             error = it.message ?: it.toString()
         }
+    }
+
+    fun performSearch(query: String) {
+        val s = session ?: return
+        searchResults = if (query.isBlank()) {
+            emptyList()
+        } else {
+            s.search(query)
+        }
+    }
+
+    fun navigateToSearchResult(result: SearchResultItem) {
+        val s = session ?: return
+        val snap = s.restorePosition(
+            SavedPosition(
+                spineIndex = result.spineIndex,
+                progression = result.progression,
+            )
+        )
+        refresh(s, snap)
+        isSearchExpanded = false
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -342,6 +379,20 @@ private fun ReaderScreen(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
             )
             Spacer(modifier = ComposeModifier.height(12.dp))
+            if (session != null) {
+                SearchBar(
+                    query = searchQuery,
+                    onQueryChange = { newQuery ->
+                        searchQuery = newQuery
+                        performSearch(newQuery)
+                    },
+                    isExpanded = isSearchExpanded,
+                    onExpandedChange = { isSearchExpanded = it },
+                    results = searchResults,
+                    onResultClick = { result -> navigateToSearchResult(result) },
+                    snapshot = snapshot,
+                )
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -412,6 +463,113 @@ private fun ReaderScreen(
                         null,
                     )
                 },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    isExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    results: List<SearchResultItem>,
+    onResultClick: (SearchResultItem) -> Unit,
+    snapshot: ReaderSnapshot?,
+) {
+    Column(modifier = ComposeModifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = ComposeModifier.fillMaxWidth(),
+            placeholder = { Text("Buscar no livro…") },
+            singleLine = true,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "Buscar",
+                )
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = {
+                        onQueryChange("")
+                        onExpandedChange(false)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Limpar",
+                        )
+                    }
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            ),
+        )
+
+        if (query.isNotEmpty() && results.isNotEmpty()) {
+            Spacer(modifier = ComposeModifier.height(8.dp))
+            LazyColumn(
+                modifier = ComposeModifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items(results) { result ->
+                    SearchResultRow(
+                        result = result,
+                        snapshot = snapshot,
+                        onClick = { onResultClick(result) },
+                    )
+                }
+            }
+        } else if (query.isNotEmpty() && results.isEmpty()) {
+            Spacer(modifier = ComposeModifier.height(8.dp))
+            Text(
+                text = "Nenhum resultado encontrado",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        Spacer(modifier = ComposeModifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun SearchResultRow(
+    result: SearchResultItem,
+    snapshot: ReaderSnapshot?,
+    onClick: () -> Unit,
+) {
+    val chapterName = snapshot?.toc
+        ?.find { it.spineIndex == result.spineIndex }
+        ?.title
+        ?: "Página ${result.spineIndex.toInt() + 1}"
+
+    Surface(
+        modifier = ComposeModifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.small,
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = ComposeModifier.padding(12.dp),
+        ) {
+            Text(
+                text = chapterName,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = result.snippet,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                maxLines = 2,
             )
         }
     }
