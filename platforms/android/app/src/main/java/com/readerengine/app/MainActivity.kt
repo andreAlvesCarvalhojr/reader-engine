@@ -1,5 +1,7 @@
 package com.readerengine.app
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.res.AssetManager
 import android.net.Uri
 import android.os.Bundle
@@ -32,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -40,13 +43,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import uniffi.reader_ffi.FfiReaderSession
 import uniffi.reader_ffi.ReaderEngine
 import uniffi.reader_ffi.ReaderSnapshot
+import uniffi.reader_ffi.SavedPosition
 import androidx.compose.ui.Modifier as ComposeModifier
+
+/** Manages reading position persistence using SharedPreferences. */
+class ReadingPositionStore(context: Context) {
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("reading_positions", Context.MODE_PRIVATE)
+
+    fun save(bookId: String, position: SavedPosition) {
+        prefs.edit()
+            .putInt("${bookId}_spine_index", position.spineIndex.toInt())
+            .putFloat("${bookId}_progression", position.progression)
+            .apply()
+    }
+
+    fun load(bookId: String): SavedPosition? {
+        if (!prefs.contains("${bookId}_spine_index")) return null
+        return SavedPosition(
+            spineIndex = prefs.getInt("${bookId}_spine_index", 0).toUInt(),
+            progression = prefs.getFloat("${bookId}_progression", 0f),
+        )
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,6 +151,10 @@ private fun ReaderScreen(
     readUri: (Uri) -> ByteArray,
     displayName: (Uri) -> String,
 ) {
+    val context = LocalContext.current
+    val positionStore = remember { ReadingPositionStore(context) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     var session by remember { mutableStateOf<FfiReaderSession?>(null) }
     var snapshot by remember { mutableStateOf<ReaderSnapshot?>(null) }
     var html by remember { mutableStateOf("") }
@@ -129,7 +162,15 @@ private fun ReaderScreen(
     var fontScale by remember { mutableFloatStateOf(1f) }
     var activeSample by remember { mutableStateOf<String?>(null) }
 
-    fun refresh(from: FfiReaderSession, snap: ReaderSnapshot) {
+    fun saveCurrentPosition() {
+        val s = session ?: return
+        val snap = snapshot ?: return
+        val pos = s.getPosition()
+        positionStore.save(snap.bookId, pos)
+    }
+
+    fun refresh(from: FfiReaderSession, snap: ReaderSnapshot, savePosition: Boolean = true) {
+        if (savePosition) saveCurrentPosition()
         session = from
         snapshot = snap
         fontScale = snap.fontScale
@@ -139,11 +180,34 @@ private fun ReaderScreen(
 
     fun openBytes(name: String, bytes: ByteArray, sampleId: String?) {
         runCatching {
+            saveCurrentPosition()
             val opened = engine.open(name, bytes)
-            refresh(opened, opened.snapshot())
+            var snap = opened.snapshot()
+            val savedPos = positionStore.load(snap.bookId)
+            if (savedPos != null) {
+                snap = opened.restorePosition(savedPos)
+            }
+            refresh(opened, snap, savePosition = false)
             activeSample = sampleId
         }.onFailure {
             error = it.message ?: it.toString()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                session?.let { s ->
+                    snapshot?.let { snap ->
+                        val pos = s.getPosition()
+                        positionStore.save(snap.bookId, pos)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

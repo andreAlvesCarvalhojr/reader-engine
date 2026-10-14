@@ -197,4 +197,48 @@ mod tests {
         s.dispatch(Command::Next);
         assert_eq!(s.state().locator.spine_index, 0);
     }
+
+    #[test]
+    fn locator_can_be_serialized_and_restored() {
+        let mut s = ReaderSession::new(pub_with_pages(5), theme());
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 3,
+            progression: 0.75,
+        }));
+
+        let locator = s.state().locator.clone();
+        let json = serde_json::to_string(&locator).expect("serialize locator");
+        let restored: Locator = serde_json::from_str(&json).expect("deserialize locator");
+
+        assert_eq!(restored.spine_index, 3);
+        assert!((restored.progression - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn restore_position_after_session_recreate() {
+        let mut s1 = ReaderSession::new(pub_with_pages(5), theme());
+        s1.dispatch(Command::GoTo(Locator {
+            spine_index: 2,
+            progression: 0.5,
+        }));
+        let saved_locator = s1.state().locator.clone();
+
+        let mut s2 = ReaderSession::new(pub_with_pages(5), theme());
+        assert_eq!(s2.state().locator.spine_index, 0);
+
+        s2.dispatch(Command::GoTo(saved_locator));
+        assert_eq!(s2.state().locator.spine_index, 2);
+        assert!((s2.state().locator.progression - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn restore_position_clamps_to_valid_range() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 100,
+            progression: 2.0,
+        }));
+        assert_eq!(s.state().locator.spine_index, 2);
+        assert!((s.state().locator.progression - 1.0).abs() < f32::EPSILON);
+    }
 }

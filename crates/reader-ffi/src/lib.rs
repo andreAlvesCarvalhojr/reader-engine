@@ -33,6 +33,14 @@ pub struct TocItem {
     pub spine_index: u32,
 }
 
+/// Reading position that can be persisted and restored.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct SavedPosition {
+    pub spine_index: u32,
+    /// 0.0..=1.0 progression within the spine item.
+    pub progression: f32,
+}
+
 /// Snapshot do estado para a UI observar.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct ReaderSnapshot {
@@ -42,6 +50,8 @@ pub struct ReaderSnapshot {
     pub spine_len: u32,
     pub font_scale: f32,
     pub toc: Vec<TocItem>,
+    /// Stable identifier for the book, used as key for persisting reading position.
+    pub book_id: String,
 }
 
 fn default_registry() -> Registry {
@@ -69,6 +79,16 @@ fn inject_theme_css(mut html: String, css: &str) -> String {
     html
 }
 
+fn book_id_of(session: &ReaderSession) -> String {
+    let meta = &session.publication().metadata;
+    if let Some(id) = &meta.identifier {
+        if !id.is_empty() {
+            return id.clone();
+        }
+    }
+    format!("{}:{}", meta.title, meta.authors.join(","))
+}
+
 fn snapshot_of(session: &ReaderSession) -> ReaderSnapshot {
     let pub_ = session.publication();
     let st = session.state();
@@ -90,6 +110,7 @@ fn snapshot_of(session: &ReaderSession) -> ReaderSnapshot {
         spine_len: st.spine_len as u32,
         font_scale: st.font_scale,
         toc,
+        book_id: book_id_of(session),
     }
 }
 
@@ -182,6 +203,26 @@ impl FfiReaderSession {
         let css = st.theme.to_content_css(st.font_scale);
         Ok(inject_theme_css(html, &css))
     }
+
+    /// Returns the current reading position for persistence.
+    pub fn get_position(&self) -> SavedPosition {
+        let g = self.inner.lock().expect("session lock");
+        let loc = &g.state().locator;
+        SavedPosition {
+            spine_index: loc.spine_index as u32,
+            progression: loc.progression,
+        }
+    }
+
+    /// Restores a previously saved reading position.
+    pub fn restore_position(&self, position: SavedPosition) -> ReaderSnapshot {
+        let mut g = self.inner.lock().expect("session lock");
+        g.dispatch(Command::GoTo(Locator {
+            spine_index: position.spine_index as usize,
+            progression: position.progression,
+        }));
+        snapshot_of(&g)
+    }
 }
 
 #[cfg(test)]
@@ -221,5 +262,60 @@ mod tests {
         assert_eq!(snap.title, "EPUB Fixture");
         assert_eq!(snap.spine_len, 2);
         assert!(!session.current_html().unwrap().is_empty());
+    }
+
+    #[test]
+    fn get_and_restore_position() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        session.next();
+        session.next();
+        let pos = session.get_position();
+        assert_eq!(pos.spine_index, 2);
+        assert!((pos.progression - 0.0).abs() < f32::EPSILON);
+
+        session.prev();
+        assert_eq!(session.snapshot().spine_index, 1);
+
+        let snap = session.restore_position(pos);
+        assert_eq!(snap.spine_index, 2);
+    }
+
+    #[test]
+    fn snapshot_includes_book_id() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+        let snap = session.snapshot();
+        assert!(!snap.book_id.is_empty());
+    }
+
+    #[test]
+    fn restore_position_across_sessions() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+
+        let session1 = engine
+            .open("noite-clara.json".into(), bytes.clone())
+            .expect("open json");
+        session1.next();
+        session1.next();
+        let saved_pos = session1.get_position();
+        let saved_book_id = session1.snapshot().book_id.clone();
+
+        let session2 = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+        assert_eq!(session2.snapshot().spine_index, 0);
+        assert_eq!(session2.snapshot().book_id, saved_book_id);
+
+        let snap = session2.restore_position(saved_pos);
+        assert_eq!(snap.spine_index, 2);
     }
 }
