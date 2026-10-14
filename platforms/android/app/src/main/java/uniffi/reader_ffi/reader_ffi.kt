@@ -746,6 +746,10 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -767,6 +771,8 @@ fun uniffi_reader_ffi_checksum_method_ffireadersession_get_position(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to(
 ): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to_with_progression(
+): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_list_resources(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_next(
@@ -774,6 +780,8 @@ fun uniffi_reader_ffi_checksum_method_ffireadersession_next(
 fun uniffi_reader_ffi_checksum_method_ffireadersession_prev(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_read_resource(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_report_progression(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type(
 ): Short
@@ -848,6 +856,8 @@ fun uniffi_reader_ffi_fn_method_ffireadersession_get_position(`ptr`: Pointer,uni
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_go_to(`ptr`: Pointer,`spineIndex`: Int,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_go_to_with_progression(`ptr`: Pointer,`spineIndex`: Int,`progression`: Float,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_list_resources(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_next(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
@@ -855,6 +865,8 @@ fun uniffi_reader_ffi_fn_method_ffireadersession_next(`ptr`: Pointer,uniffi_out_
 fun uniffi_reader_ffi_fn_method_ffireadersession_prev(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_read_resource(`ptr`: Pointer,`href`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_report_progression(`ptr`: Pointer,`progression`: Float,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_resource_media_type(`ptr`: Pointer,`href`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -1009,6 +1021,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to() != 39203.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to_with_progression() != 50952.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_list_resources() != 31945.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1019,6 +1034,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_read_resource() != 36659.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_report_progression() != 42353.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type() != 14435.toShort()) {
@@ -1424,6 +1442,11 @@ public interface FfiReaderSessionInterface {
     fun `goTo`(`spineIndex`: kotlin.UInt): ReaderSnapshot
     
     /**
+     * Go to a specific spine item with a specific progression.
+     */
+    fun `goToWithProgression`(`spineIndex`: kotlin.UInt, `progression`: kotlin.Float): ReaderSnapshot
+    
+    /**
      * List all resources in the publication with their media types.
      */
     fun `listResources`(): List<ResourceInfo>
@@ -1437,6 +1460,12 @@ public interface FfiReaderSessionInterface {
      * Use this to serve images, stylesheets, fonts, etc. to WebView.
      */
     fun `readResource`(`href`: kotlin.String): kotlin.ByteArray
+    
+    /**
+     * Reports the current scroll position within the chapter (0.0..=1.0).
+     * Call this from the client when the user scrolls.
+     */
+    fun `reportProgression`(`progression`: kotlin.Float): ReaderSnapshot
     
     /**
      * Get the media type for a resource href, if known.
@@ -1590,6 +1619,21 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
 
     
     /**
+     * Go to a specific spine item with a specific progression.
+     */override fun `goToWithProgression`(`spineIndex`: kotlin.UInt, `progression`: kotlin.Float): ReaderSnapshot {
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_go_to_with_progression(
+        it, FfiConverterUInt.lower(`spineIndex`),FfiConverterFloat.lower(`progression`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * List all resources in the publication with their media types.
      */override fun `listResources`(): List<ResourceInfo> {
             return FfiConverterSequenceTypeResourceInfo.lift(
@@ -1638,6 +1682,22 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     uniffiRustCallWithError(ReaderFfiException) { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_read_resource(
         it, FfiConverterString.lower(`href`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Reports the current scroll position within the chapter (0.0..=1.0).
+     * Call this from the client when the user scrolls.
+     */override fun `reportProgression`(`progression`: kotlin.Float): ReaderSnapshot {
+            return FfiConverterTypeReaderSnapshot.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_report_progression(
+        it, FfiConverterFloat.lower(`progression`),_status)
 }
     }
     )
@@ -2021,7 +2081,15 @@ data class ReaderSnapshot (
     /**
      * Stable identifier for the book, used as key for persisting reading position.
      */
-    var `bookId`: kotlin.String
+    var `bookId`: kotlin.String, 
+    /**
+     * Current chapter progress (0.0..=1.0).
+     */
+    var `chapterProgress`: kotlin.Float, 
+    /**
+     * Overall book progress (0.0..=1.0).
+     */
+    var `bookProgress`: kotlin.Float
 ) {
     
     companion object
@@ -2040,6 +2108,8 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterFloat.read(buf),
             FfiConverterSequenceTypeTocItem.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
         )
     }
 
@@ -2050,7 +2120,9 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterUInt.allocationSize(value.`spineLen`) +
             FfiConverterFloat.allocationSize(value.`fontScale`) +
             FfiConverterSequenceTypeTocItem.allocationSize(value.`toc`) +
-            FfiConverterString.allocationSize(value.`bookId`)
+            FfiConverterString.allocationSize(value.`bookId`) +
+            FfiConverterFloat.allocationSize(value.`chapterProgress`) +
+            FfiConverterFloat.allocationSize(value.`bookProgress`)
     )
 
     override fun write(value: ReaderSnapshot, buf: ByteBuffer) {
@@ -2061,6 +2133,8 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterFloat.write(value.`fontScale`, buf)
             FfiConverterSequenceTypeTocItem.write(value.`toc`, buf)
             FfiConverterString.write(value.`bookId`, buf)
+            FfiConverterFloat.write(value.`chapterProgress`, buf)
+            FfiConverterFloat.write(value.`bookProgress`, buf)
     }
 }
 

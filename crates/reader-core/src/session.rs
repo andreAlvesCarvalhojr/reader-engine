@@ -8,6 +8,8 @@ pub enum Command {
     GoTo(Locator),
     SetTheme(ThemeTokens),
     SetFontScale(f32),
+    /// Update the progression (0.0..=1.0) within the current spine item.
+    ReportProgression(f32),
 }
 
 /// Estado que a UI nativa observa para se renderizar.
@@ -65,8 +67,27 @@ impl ReaderSession {
             }
             Command::SetTheme(t) => self.state.theme = t,
             Command::SetFontScale(s) => self.state.font_scale = s.clamp(0.5, 3.0),
+            Command::ReportProgression(p) => {
+                self.state.locator.progression = p.clamp(0.0, 1.0);
+            }
         }
         &self.state
+    }
+
+    /// Returns the current chapter progress as a value in 0.0..=1.0.
+    pub fn chapter_progress(&self) -> f32 {
+        self.state.locator.progression
+    }
+
+    /// Returns the overall book progress as a value in 0.0..=1.0.
+    /// This is calculated as (completed_chapters + current_chapter_progress) / total_chapters.
+    pub fn book_progress(&self) -> f32 {
+        if self.state.spine_len == 0 {
+            return 0.0;
+        }
+        let completed = self.state.locator.spine_index as f32;
+        let current = self.state.locator.progression;
+        (completed + current) / self.state.spine_len as f32
     }
 }
 
@@ -240,5 +261,94 @@ mod tests {
         }));
         assert_eq!(s.state().locator.spine_index, 2);
         assert!((s.state().locator.progression - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn report_progression_updates_locator() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.dispatch(Command::ReportProgression(0.5));
+        assert!((s.state().locator.progression - 0.5).abs() < f32::EPSILON);
+        assert_eq!(s.state().locator.spine_index, 0);
+    }
+
+    #[test]
+    fn report_progression_clamps_value() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.dispatch(Command::ReportProgression(1.5));
+        assert!((s.state().locator.progression - 1.0).abs() < f32::EPSILON);
+
+        s.dispatch(Command::ReportProgression(-0.5));
+        assert!((s.state().locator.progression - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn chapter_progress_returns_current_progression() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        assert!((s.chapter_progress() - 0.0).abs() < f32::EPSILON);
+
+        s.dispatch(Command::ReportProgression(0.75));
+        assert!((s.chapter_progress() - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn book_progress_calculation() {
+        let mut s = ReaderSession::new(pub_with_pages(4), theme());
+        // At start: 0 / 4 = 0.0
+        assert!((s.book_progress() - 0.0).abs() < f32::EPSILON);
+
+        // Go to chapter 2 (index 1), no progression: 1 / 4 = 0.25
+        s.dispatch(Command::Next);
+        assert!((s.book_progress() - 0.25).abs() < f32::EPSILON);
+
+        // At chapter 2 with 50% progression: (1 + 0.5) / 4 = 0.375
+        s.dispatch(Command::ReportProgression(0.5));
+        assert!((s.book_progress() - 0.375).abs() < f32::EPSILON);
+
+        // Go to last chapter (index 3), no progression: 3 / 4 = 0.75
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 3,
+            progression: 0.0,
+        }));
+        assert!((s.book_progress() - 0.75).abs() < f32::EPSILON);
+
+        // At last chapter with 100% progression: (3 + 1.0) / 4 = 1.0
+        s.dispatch(Command::ReportProgression(1.0));
+        assert!((s.book_progress() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn book_progress_empty_spine() {
+        let s = ReaderSession::new(pub_with_pages(0), theme());
+        assert!((s.book_progress() - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn progression_preserved_across_goto() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.dispatch(Command::GoTo(Locator {
+            spine_index: 1,
+            progression: 0.6,
+        }));
+        assert_eq!(s.state().locator.spine_index, 1);
+        assert!((s.state().locator.progression - 0.6).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn next_resets_progression_to_zero() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.dispatch(Command::ReportProgression(0.8));
+        s.dispatch(Command::Next);
+        assert_eq!(s.state().locator.spine_index, 1);
+        assert!((s.state().locator.progression - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn prev_resets_progression_to_zero() {
+        let mut s = ReaderSession::new(pub_with_pages(3), theme());
+        s.dispatch(Command::Next);
+        s.dispatch(Command::ReportProgression(0.8));
+        s.dispatch(Command::Prev);
+        assert_eq!(s.state().locator.spine_index, 0);
+        assert!((s.state().locator.progression - 0.0).abs() < f32::EPSILON);
     }
 }

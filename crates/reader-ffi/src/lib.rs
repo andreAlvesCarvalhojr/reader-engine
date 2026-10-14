@@ -59,6 +59,10 @@ pub struct ReaderSnapshot {
     pub toc: Vec<TocItem>,
     /// Stable identifier for the book, used as key for persisting reading position.
     pub book_id: String,
+    /// Current chapter progress (0.0..=1.0).
+    pub chapter_progress: f32,
+    /// Overall book progress (0.0..=1.0).
+    pub book_progress: f32,
 }
 
 fn default_registry() -> Registry {
@@ -74,8 +78,58 @@ fn default_theme() -> ThemeTokens {
         .expect("themes/material3.json válido")
 }
 
-fn inject_theme_css(mut html: String, css: &str) -> String {
-    let inject = format!("<style>{css}</style>");
+fn inject_theme_css(mut html: String, css: &str, initial_scroll: f32) -> String {
+    let scroll_script = format!(
+        r#"<script>
+(function() {{
+    var lastReported = 0;
+    var scrollTimeout = null;
+    
+    function getScrollProgress() {{
+        var scrollTop = document.documentElement.scrollTop || document.body.scrollTop || 0;
+        var scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 1;
+        var clientHeight = document.documentElement.clientHeight || document.body.clientHeight || 0;
+        var maxScroll = Math.max(0, scrollHeight - clientHeight);
+        if (maxScroll === 0) return 0;
+        return Math.min(1, Math.max(0, scrollTop / maxScroll));
+    }}
+    
+    function reportProgress() {{
+        var progress = getScrollProgress();
+        if (Math.abs(progress - lastReported) > 0.01) {{
+            lastReported = progress;
+            if (window.AndroidScrollProgress) {{
+                window.AndroidScrollProgress.reportProgress(progress);
+            }}
+        }}
+    }}
+    
+    function restoreScroll() {{
+        var initialScroll = {initial_scroll};
+        if (initialScroll > 0) {{
+            var scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 0;
+            var clientHeight = document.documentElement.clientHeight || document.body.clientHeight || 0;
+            var maxScroll = Math.max(0, scrollHeight - clientHeight);
+            var scrollTop = maxScroll * initialScroll;
+            window.scrollTo(0, scrollTop);
+            lastReported = initialScroll;
+        }}
+    }}
+    
+    document.addEventListener('scroll', function() {{
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(reportProgress, 100);
+    }}, {{ passive: true }});
+    
+    if (document.readyState === 'complete') {{
+        restoreScroll();
+    }} else {{
+        window.addEventListener('load', restoreScroll);
+    }}
+}})();
+</script>"#
+    );
+    let inject = format!("<style>{css}</style>{scroll_script}");
     if let Some(pos) = html.find("</head>") {
         html.insert_str(pos, &inject);
     } else if let Some(pos) = html.find("<body") {
@@ -118,6 +172,8 @@ fn snapshot_of(session: &ReaderSession) -> ReaderSnapshot {
         font_scale: st.font_scale,
         toc,
         book_id: book_id_of(session),
+        chapter_progress: session.chapter_progress(),
+        book_progress: session.book_progress(),
     }
 }
 
@@ -179,6 +235,24 @@ impl FfiReaderSession {
         snapshot_of(&g)
     }
 
+    /// Go to a specific spine item with a specific progression.
+    pub fn go_to_with_progression(&self, spine_index: u32, progression: f32) -> ReaderSnapshot {
+        let mut g = self.inner.lock().expect("session lock");
+        g.dispatch(Command::GoTo(Locator {
+            spine_index: spine_index as usize,
+            progression,
+        }));
+        snapshot_of(&g)
+    }
+
+    /// Reports the current scroll position within the chapter (0.0..=1.0).
+    /// Call this from the client when the user scrolls.
+    pub fn report_progression(&self, progression: f32) -> ReaderSnapshot {
+        let mut g = self.inner.lock().expect("session lock");
+        g.dispatch(Command::ReportProgression(progression));
+        snapshot_of(&g)
+    }
+
     pub fn set_font_scale(&self, scale: f32) -> ReaderSnapshot {
         let mut g = self.inner.lock().expect("session lock");
         g.dispatch(Command::SetFontScale(scale));
@@ -208,7 +282,8 @@ impl FfiReaderSession {
         let html =
             String::from_utf8(bytes).map_err(|e| ReaderFfiError::Engine { msg: e.to_string() })?;
         let css = st.theme.to_content_css(st.font_scale);
-        Ok(inject_theme_css(html, &css))
+        let initial_scroll = st.locator.progression;
+        Ok(inject_theme_css(html, &css, initial_scroll))
     }
 
     /// Returns the current reading position for persistence.
@@ -402,5 +477,120 @@ mod tests {
         let session = engine.open("sample.epub".into(), bytes).expect("open epub");
         let result = session.read_resource("nonexistent.png".into());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn snapshot_includes_progress_fields() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let snap = session.snapshot();
+        assert!((snap.chapter_progress - 0.0).abs() < f32::EPSILON);
+        assert!((snap.book_progress - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn report_progression_updates_snapshot() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let snap = session.report_progression(0.5);
+        assert!((snap.chapter_progress - 0.5).abs() < f32::EPSILON);
+        assert!(snap.book_progress > 0.0);
+    }
+
+    #[test]
+    fn report_progression_clamps_values() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let snap = session.report_progression(1.5);
+        assert!((snap.chapter_progress - 1.0).abs() < f32::EPSILON);
+
+        let snap = session.report_progression(-0.5);
+        assert!((snap.chapter_progress - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn book_progress_advances_with_navigation() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        // At start
+        let snap = session.snapshot();
+        assert!((snap.book_progress - 0.0).abs() < f32::EPSILON);
+
+        // After moving to next chapter
+        let snap = session.next();
+        assert!(snap.book_progress > 0.0);
+
+        // After adding some progression
+        let snap = session.report_progression(0.5);
+        let expected = (1.0 + 0.5) / 3.0; // (1 completed + 0.5 progress) / 3 total
+        assert!((snap.book_progress - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn go_to_with_progression_sets_exact_position() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let snap = session.go_to_with_progression(1, 0.75);
+        assert_eq!(snap.spine_index, 1);
+        assert!((snap.chapter_progress - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn restore_position_preserves_progression() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        // Navigate and add progression
+        session.next();
+        session.report_progression(0.65);
+        let pos = session.get_position();
+
+        // Navigate away
+        session.prev();
+        assert_eq!(session.snapshot().spine_index, 0);
+
+        // Restore position
+        let snap = session.restore_position(pos);
+        assert_eq!(snap.spine_index, 1);
+        assert!((snap.chapter_progress - 0.65).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn saved_position_includes_progression() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        session.next();
+        session.report_progression(0.42);
+        let pos = session.get_position();
+
+        assert_eq!(pos.spine_index, 1);
+        assert!((pos.progression - 0.42).abs() < f32::EPSILON);
     }
 }
