@@ -3,6 +3,7 @@ Cargo.lock.bak
 .idea/
 .vs/
 *.swp
+.DS_Store
 
 # Local test fixtures (do not commit large/user data)
 fixtures/local/
