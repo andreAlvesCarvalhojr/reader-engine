@@ -740,6 +740,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // For large crates we prevent `MethodTooLargeException` (see #2340)
 // N.B. the name of the extension is very misleading, since it is 
 // rather `InterfaceTooLargeException`, caused by too many methods 
@@ -757,15 +759,17 @@ internal interface IntegrityCheckingUniffiLib : Library {
     // Integrity check functions only
     fun uniffi_reader_ffi_checksum_method_ffireadersession_current_html(
 ): Short
-fun uniffi_reader_ffi_checksum_method_ffireadersession_get_position(
-): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_go_to(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_list_resources(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_next(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_prev(
 ): Short
-fun uniffi_reader_ffi_checksum_method_ffireadersession_restore_position(
+fun uniffi_reader_ffi_checksum_method_ffireadersession_read_resource(
+): Short
+fun uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type(
 ): Short
 fun uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale(
 ): Short
@@ -832,15 +836,17 @@ fun uniffi_reader_ffi_fn_free_ffireadersession(`ptr`: Pointer,uniffi_out_err: Un
 ): Unit
 fun uniffi_reader_ffi_fn_method_ffireadersession_current_html(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_reader_ffi_fn_method_ffireadersession_get_position(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_go_to(`ptr`: Pointer,`spineIndex`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_list_resources(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_next(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_prev(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun uniffi_reader_ffi_fn_method_ffireadersession_restore_position(`ptr`: Pointer,`position`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+fun uniffi_reader_ffi_fn_method_ffireadersession_read_resource(`ptr`: Pointer,`href`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+fun uniffi_reader_ffi_fn_method_ffireadersession_resource_media_type(`ptr`: Pointer,`href`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 fun uniffi_reader_ffi_fn_method_ffireadersession_set_font_scale(`ptr`: Pointer,`scale`: Float,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -985,10 +991,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_current_html() != 32182.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_get_position() != 57669.toShort()) {
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to() != 39203.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_go_to() != 39203.toShort()) {
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_list_resources() != 31945.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_next() != 37943.toShort()) {
@@ -997,7 +1003,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_prev() != 63917.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_restore_position() != 64462.toShort()) {
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_read_resource() != 36659.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_resource_media_type() != 14435.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_reader_ffi_checksum_method_ffireadersession_set_font_scale() != 10257.toShort()) {
@@ -1389,21 +1398,27 @@ public interface FfiReaderSessionInterface {
      */
     fun `currentHtml`(): kotlin.String
     
-    /**
-     * Returns the current reading position for persistence.
-     */
-    fun `getPosition`(): SavedPosition
-    
     fun `goTo`(`spineIndex`: kotlin.UInt): ReaderSnapshot
+    
+    /**
+     * List all resources in the publication with their media types.
+     */
+    fun `listResources`(): List<ResourceInfo>
     
     fun `next`(): ReaderSnapshot
     
     fun `prev`(): ReaderSnapshot
     
     /**
-     * Restores a previously saved reading position.
+     * Read a resource from the publication by its href.
+     * Use this to serve images, stylesheets, fonts, etc. to WebView.
      */
-    fun `restorePosition`(`position`: SavedPosition): ReaderSnapshot
+    fun `readResource`(`href`: kotlin.String): kotlin.ByteArray
+    
+    /**
+     * Get the media type for a resource href, if known.
+     */
+    fun `resourceMediaType`(`href`: kotlin.String): kotlin.String?
     
     fun `setFontScale`(`scale`: kotlin.Float): ReaderSnapshot
     
@@ -1518,27 +1533,27 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
     }
     
 
-    
-    /**
-     * Returns the current reading position for persistence.
-     */override fun `getPosition`(): SavedPosition {
-            return FfiConverterTypeSavedPosition.lift(
-    callWithPointer {
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_get_position(
-        it, _status)
-}
-    }
-    )
-    }
-    
-
     override fun `goTo`(`spineIndex`: kotlin.UInt): ReaderSnapshot {
             return FfiConverterTypeReaderSnapshot.lift(
     callWithPointer {
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_go_to(
         it, FfiConverterUInt.lower(`spineIndex`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * List all resources in the publication with their media types.
+     */override fun `listResources`(): List<ResourceInfo> {
+            return FfiConverterSequenceTypeResourceInfo.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_list_resources(
+        it, _status)
 }
     }
     )
@@ -1571,13 +1586,30 @@ open class FfiReaderSession: Disposable, AutoCloseable, FfiReaderSessionInterfac
 
     
     /**
-     * Restores a previously saved reading position.
-     */override fun `restorePosition`(`position`: SavedPosition): ReaderSnapshot {
-            return FfiConverterTypeReaderSnapshot.lift(
+     * Read a resource from the publication by its href.
+     * Use this to serve images, stylesheets, fonts, etc. to WebView.
+     */
+    @Throws(ReaderFfiException::class)override fun `readResource`(`href`: kotlin.String): kotlin.ByteArray {
+            return FfiConverterByteArray.lift(
+    callWithPointer {
+    uniffiRustCallWithError(ReaderFfiException) { _status ->
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_read_resource(
+        it, FfiConverterString.lower(`href`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Get the media type for a resource href, if known.
+     */override fun `resourceMediaType`(`href`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
     callWithPointer {
     uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_restore_position(
-        it, FfiConverterTypeSavedPosition.lower(`position`),_status)
+    UniffiLib.INSTANCE.uniffi_reader_ffi_fn_method_ffireadersession_resource_media_type(
+        it, FfiConverterString.lower(`href`),_status)
 }
     }
     )
@@ -1927,11 +1959,7 @@ data class ReaderSnapshot (
     var `spineIndex`: kotlin.UInt, 
     var `spineLen`: kotlin.UInt, 
     var `fontScale`: kotlin.Float, 
-    var `toc`: List<TocItem>, 
-    /**
-     * Stable identifier for the book, used as key for persisting reading position.
-     */
-    var `bookId`: kotlin.String
+    var `toc`: List<TocItem>
 ) {
     
     companion object
@@ -1949,7 +1977,6 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterUInt.read(buf),
             FfiConverterFloat.read(buf),
             FfiConverterSequenceTypeTocItem.read(buf),
-            FfiConverterString.read(buf),
         )
     }
 
@@ -1959,8 +1986,7 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterUInt.allocationSize(value.`spineIndex`) +
             FfiConverterUInt.allocationSize(value.`spineLen`) +
             FfiConverterFloat.allocationSize(value.`fontScale`) +
-            FfiConverterSequenceTypeTocItem.allocationSize(value.`toc`) +
-            FfiConverterString.allocationSize(value.`bookId`)
+            FfiConverterSequenceTypeTocItem.allocationSize(value.`toc`)
     )
 
     override fun write(value: ReaderSnapshot, buf: ByteBuffer) {
@@ -1970,21 +1996,17 @@ public object FfiConverterTypeReaderSnapshot: FfiConverterRustBuffer<ReaderSnaps
             FfiConverterUInt.write(value.`spineLen`, buf)
             FfiConverterFloat.write(value.`fontScale`, buf)
             FfiConverterSequenceTypeTocItem.write(value.`toc`, buf)
-            FfiConverterString.write(value.`bookId`, buf)
     }
 }
 
 
 
 /**
- * Reading position that can be persisted and restored.
+ * Info about a publication resource for resource listing.
  */
-data class SavedPosition (
-    var `spineIndex`: kotlin.UInt, 
-    /**
-     * 0.0..=1.0 progression within the spine item.
-     */
-    var `progression`: kotlin.Float
+data class ResourceInfo (
+    var `href`: kotlin.String, 
+    var `mediaType`: kotlin.String
 ) {
     
     companion object
@@ -1993,22 +2015,22 @@ data class SavedPosition (
 /**
  * @suppress
  */
-public object FfiConverterTypeSavedPosition: FfiConverterRustBuffer<SavedPosition> {
-    override fun read(buf: ByteBuffer): SavedPosition {
-        return SavedPosition(
-            FfiConverterUInt.read(buf),
-            FfiConverterFloat.read(buf),
+public object FfiConverterTypeResourceInfo: FfiConverterRustBuffer<ResourceInfo> {
+    override fun read(buf: ByteBuffer): ResourceInfo {
+        return ResourceInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
-    override fun allocationSize(value: SavedPosition) = (
-            FfiConverterUInt.allocationSize(value.`spineIndex`) +
-            FfiConverterFloat.allocationSize(value.`progression`)
+    override fun allocationSize(value: ResourceInfo) = (
+            FfiConverterString.allocationSize(value.`href`) +
+            FfiConverterString.allocationSize(value.`mediaType`)
     )
 
-    override fun write(value: SavedPosition, buf: ByteBuffer) {
-            FfiConverterUInt.write(value.`spineIndex`, buf)
-            FfiConverterFloat.write(value.`progression`, buf)
+    override fun write(value: ResourceInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`href`, buf)
+            FfiConverterString.write(value.`mediaType`, buf)
     }
 }
 
@@ -2115,6 +2137,38 @@ public object FfiConverterTypeReaderFfiError : FfiConverterRustBuffer<ReaderFfiE
 /**
  * @suppress
  */
+public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?> {
+    override fun read(buf: ByteBuffer): kotlin.String? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterString.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.String?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterString.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.String?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterString.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -2133,6 +2187,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeResourceInfo: FfiConverterRustBuffer<List<ResourceInfo>> {
+    override fun read(buf: ByteBuffer): List<ResourceInfo> {
+        val len = buf.getInt()
+        return List<ResourceInfo>(len) {
+            FfiConverterTypeResourceInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ResourceInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeResourceInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ResourceInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeResourceInfo.write(it, buf)
         }
     }
 }

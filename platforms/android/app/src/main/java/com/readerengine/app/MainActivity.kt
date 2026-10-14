@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.content.res.AssetManager
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -54,7 +56,10 @@ import uniffi.reader_ffi.FfiReaderSession
 import uniffi.reader_ffi.ReaderEngine
 import uniffi.reader_ffi.ReaderSnapshot
 import uniffi.reader_ffi.SavedPosition
+import java.io.ByteArrayInputStream
 import androidx.compose.ui.Modifier as ComposeModifier
+
+private const val BOOK_BASE_URL = "book://content/"
 
 /** Manages reading position persistence using SharedPreferences. */
 class ReadingPositionStore(context: Context) {
@@ -122,6 +127,7 @@ private data class SampleBook(
 private fun bundledSamples(): List<SampleBook> = listOf(
     SampleBook("noite-clara", "Noite Clara", "samples/noite-clara.json", "noite-clara.json"),
     SampleBook("epub-fixture", "EPUB Fixture", "samples/sample.epub", "sample.epub"),
+    SampleBook("epub-with-image", "EPUB With Image", "samples/sample-with-image.epub", "sample-with-image.epub"),
 )
 
 /** Amostras em `assets/samples/local/` (gitignored; uso local de teste). */
@@ -139,6 +145,58 @@ private fun localSamples(assets: AssetManager): List<SampleBook> {
             assetPath = "samples/local/$name",
             fileName = name,
         )
+    }
+}
+
+private class BookResourceWebViewClient(
+    private val sessionProvider: () -> FfiReaderSession?,
+) : WebViewClient() {
+
+    override fun shouldInterceptRequest(
+        view: WebView?,
+        request: WebResourceRequest?,
+    ): WebResourceResponse? {
+        val url = request?.url ?: return null
+        if (url.scheme != "book" || url.host != "content") {
+            return super.shouldInterceptRequest(view, request)
+        }
+
+        val session = sessionProvider() ?: return notFoundResponse()
+        val href = url.path?.removePrefix("/") ?: return notFoundResponse()
+
+        return try {
+            val bytes = session.readResource(href)
+            val mimeType = session.resourceMediaType(href)
+                ?: guessMimeType(href)
+            WebResourceResponse(mimeType, "UTF-8", ByteArrayInputStream(bytes))
+        } catch (e: Exception) {
+            notFoundResponse()
+        }
+    }
+
+    private fun notFoundResponse() = WebResourceResponse(
+        "text/plain",
+        "UTF-8",
+        404,
+        "Not Found",
+        emptyMap(),
+        ByteArrayInputStream("Resource not found".toByteArray()),
+    )
+
+    private fun guessMimeType(href: String): String = when {
+        href.endsWith(".html") || href.endsWith(".xhtml") -> "application/xhtml+xml"
+        href.endsWith(".css") -> "text/css"
+        href.endsWith(".js") -> "application/javascript"
+        href.endsWith(".png") -> "image/png"
+        href.endsWith(".jpg") || href.endsWith(".jpeg") -> "image/jpeg"
+        href.endsWith(".gif") -> "image/gif"
+        href.endsWith(".svg") -> "image/svg+xml"
+        href.endsWith(".webp") -> "image/webp"
+        href.endsWith(".woff") -> "font/woff"
+        href.endsWith(".woff2") -> "font/woff2"
+        href.endsWith(".ttf") -> "font/ttf"
+        href.endsWith(".otf") -> "font/otf"
+        else -> "application/octet-stream"
     }
 }
 
@@ -338,14 +396,16 @@ private fun ReaderScreen(
                     .weight(1f),
                 factory = { context ->
                     WebView(context).apply {
-                        webViewClient = WebViewClient()
+                        webViewClient = BookResourceWebViewClient { session }
                         settings.javaScriptEnabled = false
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
                         setBackgroundColor(0xFFF3FAF7.toInt())
                     }
                 },
                 update = { webView ->
                     webView.loadDataWithBaseURL(
-                        null,
+                        BOOK_BASE_URL,
                         html.ifBlank { "<html><body></body></html>" },
                         "text/html",
                         "utf-8",
