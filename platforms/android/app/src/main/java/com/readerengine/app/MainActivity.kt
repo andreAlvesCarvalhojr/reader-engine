@@ -76,6 +76,11 @@ import uniffi.reader_ffi.FfiReaderSession
 import uniffi.reader_ffi.ReaderEngine
 import uniffi.reader_ffi.ReaderSnapshot
 import uniffi.reader_ffi.SavedPosition
+import uniffi.reader_ffi.SearchResultItem
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import java.io.ByteArrayInputStream
 import androidx.compose.ui.Modifier as ComposeModifier
 
@@ -269,6 +274,9 @@ private fun ReaderScreen(
     var bookProgress by remember { mutableFloatStateOf(0f) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var showBookmarks by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SearchResultItem>>(emptyList()) }
+    var isSearchExpanded by remember { mutableStateOf(false) }
 
     fun saveCurrentPosition() {
         val s = session ?: return
@@ -344,6 +352,30 @@ private fun ReaderScreen(
         s.removeBookmark(bookmark.id)
         snapshot = s.snapshot()
         saveBookmarks()
+    }
+
+    fun performSearch(query: String) {
+        val s = session ?: return
+        if (query.isBlank()) {
+            searchResults = emptyList()
+            return
+        }
+        searchResults = s.search(query)
+    }
+
+    fun navigateToSearchResult(result: SearchResultItem) {
+        val s = session ?: return
+        runCatching {
+            val position = SavedPosition(
+                spineIndex = result.spineIndex,
+                progression = result.progression,
+            )
+            val snap = s.restorePosition(position)
+            refresh(s, snap)
+            isSearchExpanded = false
+        }.onFailure {
+            error = it.message ?: it.toString()
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -502,6 +534,82 @@ private fun ReaderScreen(
                 },
                 valueRange = 0.8f..1.8f,
             )
+            Row(
+                modifier = ComposeModifier
+                    .fillMaxWidth()
+                    .clickable { isSearchExpanded = !isSearchExpanded }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "Search",
+                    modifier = ComposeModifier.size(20.dp),
+                )
+                Spacer(modifier = ComposeModifier.width(8.dp))
+                Text(
+                    text = "Buscar no livro",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = ComposeModifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (isSearchExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (isSearchExpanded) "Collapse" else "Expand",
+                    modifier = ComposeModifier.size(20.dp),
+                )
+            }
+            AnimatedVisibility(visible = isSearchExpanded) {
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Digite sua busca...") },
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { performSearch(searchQuery) }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Search,
+                                    contentDescription = "Buscar",
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        ),
+                        modifier = ComposeModifier.fillMaxWidth(),
+                    )
+                    if (searchResults.isNotEmpty()) {
+                        Spacer(modifier = ComposeModifier.height(8.dp))
+                        Text(
+                            text = "${searchResults.size} resultado(s)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        )
+                        LazyColumn(
+                            modifier = ComposeModifier.height(150.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            items(searchResults.size) { index ->
+                                val result = searchResults[index]
+                                SearchResultRow(
+                                    result = result,
+                                    chapterTitle = snapshot?.toc?.find { it.spineIndex == result.spineIndex }?.title,
+                                    onClick = { navigateToSearchResult(result) },
+                                )
+                            }
+                        }
+                    } else if (searchQuery.isNotBlank()) {
+                        Spacer(modifier = ComposeModifier.height(8.dp))
+                        Text(
+                            text = "Nenhum resultado encontrado",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = ComposeModifier.height(8.dp))
             val bookmarks = snapshot?.bookmarks ?: emptyList()
             if (bookmarks.isNotEmpty()) {
                 Row(
@@ -622,4 +730,37 @@ private fun BookmarkChip(
             }
         },
     )
+}
+
+@Composable
+private fun SearchResultRow(
+    result: SearchResultItem,
+    chapterTitle: String?,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = ComposeModifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Column(
+            modifier = ComposeModifier.padding(8.dp),
+        ) {
+            Text(
+                text = chapterTitle ?: "Capítulo ${result.spineIndex.toInt() + 1}",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = result.snippet,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+            )
+        }
+    }
 }

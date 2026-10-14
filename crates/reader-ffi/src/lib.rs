@@ -63,6 +63,19 @@ pub struct ResourceInfo {
     pub media_type: String,
 }
 
+/// A search result with location and context snippet.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct SearchResultItem {
+    /// Index of the spine item containing this match.
+    pub spine_index: u32,
+    /// Approximate progression (0.0..=1.0) within the spine item.
+    pub progression: f32,
+    /// Short snippet of text around the match.
+    pub snippet: String,
+    /// The href of the spine item.
+    pub href: String,
+}
+
 /// Information about a bookmark for FFI.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct BookmarkInfo {
@@ -390,6 +403,28 @@ impl FfiReaderSession {
             .iter()
             .find(|r| r.href == href)
             .map(|r| r.media_type.clone())
+    }
+
+    /// Searches for `query` across all spine items.
+    ///
+    /// Returns results with spine index, approximate progression within each chapter,
+    /// and a snippet of text around each match. Search is case-insensitive and
+    /// accent-insensitive (works well for Portuguese content with accents like
+    /// "lição" matching "licao").
+    ///
+    /// To navigate to a result, use `restore_position` with a `SavedPosition`
+    /// containing the result's `spine_index` and `progression`.
+    pub fn search(&self, query: String) -> Vec<SearchResultItem> {
+        let g = self.inner.lock().expect("session lock");
+        g.search(&query)
+            .into_iter()
+            .map(|r| SearchResultItem {
+                spine_index: r.spine_index as u32,
+                progression: r.progression,
+                snippet: r.snippet,
+                href: r.href,
+            })
+            .collect()
     }
 
     /// Add a bookmark at the current position with an optional label.
@@ -837,5 +872,128 @@ mod tests {
 
         let result = session.import_bookmarks_json("not valid json".into());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn search_finds_matches_in_json_book() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let results = session.search("ponte".into());
+        assert!(!results.is_empty(), "should find 'ponte' in Noite Clara");
+        assert!(results
+            .iter()
+            .any(|r| r.snippet.to_lowercase().contains("ponte")));
+
+        let results_city = session.search("cidade".into());
+        assert!(!results_city.is_empty(), "should find 'cidade'");
+    }
+
+    #[test]
+    fn search_is_case_insensitive() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let lower = session.search("ponte".into());
+        let upper = session.search("PONTE".into());
+        let mixed = session.search("Ponte".into());
+
+        assert_eq!(lower.len(), upper.len());
+        assert_eq!(lower.len(), mixed.len());
+    }
+
+    #[test]
+    fn search_is_accent_insensitive() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let with_accent = session.search("capítulo".into());
+        let without_accent = session.search("capitulo".into());
+
+        assert_eq!(with_accent.len(), without_accent.len());
+    }
+
+    #[test]
+    fn search_empty_query_returns_empty() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let empty = session.search("".into());
+        let whitespace = session.search("   ".into());
+
+        assert!(empty.is_empty());
+        assert!(whitespace.is_empty());
+    }
+
+    #[test]
+    fn search_result_has_valid_progression() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let results = session.search("ponte".into());
+        for result in &results {
+            assert!(
+                result.progression >= 0.0 && result.progression <= 1.0,
+                "progression should be in [0, 1]: {}",
+                result.progression
+            );
+            assert!(
+                (result.spine_index as usize) < session.snapshot().spine_len as usize,
+                "spine_index should be valid"
+            );
+        }
+    }
+
+    #[test]
+    fn search_in_epub() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-epub/tests/fixtures/sample.epub").to_vec();
+        let session = engine.open("sample.epub".into(), bytes).expect("open epub");
+
+        let results = session.search("Capítulo".into());
+        assert!(!results.is_empty(), "should find 'Capítulo' in sample.epub");
+
+        let results_no_accent = session.search("Capitulo".into());
+        assert_eq!(
+            results.len(),
+            results_no_accent.len(),
+            "accent-insensitive search should find same matches"
+        );
+    }
+
+    #[test]
+    fn can_navigate_to_search_result() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-demo/samples/noite-clara.json").to_vec();
+        let session = engine
+            .open("noite-clara.json".into(), bytes)
+            .expect("open json");
+
+        let results = session.search("ponte".into());
+        assert!(!results.is_empty());
+
+        let result = &results[0];
+        let saved_pos = SavedPosition {
+            spine_index: result.spine_index,
+            progression: result.progression,
+        };
+
+        let snap = session.restore_position(saved_pos);
+        assert_eq!(snap.spine_index, result.spine_index);
     }
 }

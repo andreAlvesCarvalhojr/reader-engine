@@ -11,6 +11,9 @@ const scale = document.getElementById("scale");
 const bookmarkToggle = document.getElementById("bookmark-toggle");
 const bookmarksBar = document.getElementById("bookmarks-bar");
 const bookmarksList = document.getElementById("bookmarks-list");
+const searchInput = document.getElementById("search-input");
+const searchBtn = document.getElementById("search-btn");
+const searchResults = document.getElementById("search-results");
 
 let current = null;
 let scrollTimeout = null;
@@ -229,6 +232,53 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "ArrowRight") command({ type: "next" });
   if (event.key === "ArrowLeft") command({ type: "prev" });
   if (event.key === "b" || event.key === "B") command({ type: "toggle_bookmark", label: null });
+});
+
+async function performSearch() {
+  const query = searchInput.value.trim();
+  if (!query) {
+    searchResults.innerHTML = "";
+    return;
+  }
+  try {
+    const results = await api(`/api/search?q=${encodeURIComponent(query)}`);
+    renderSearchResults(results);
+  } catch (e) {
+    searchResults.innerHTML = `<li><span style="color: var(--danger-mute);">Erro: ${e.message}</span></li>`;
+  }
+}
+
+function renderSearchResults(results) {
+  searchResults.innerHTML = "";
+  if (results.length === 0) {
+    searchResults.innerHTML = '<li><span style="color: var(--danger-mute);">Nenhum resultado</span></li>';
+    return;
+  }
+  for (const result of results) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const chapterName = current?.toc?.find(t => t.spine_index === result.spine_index)?.title || `Página ${result.spine_index + 1}`;
+    btn.innerHTML = `<span class="chapter">${chapterName}</span><span class="snippet">${escapeHtml(result.snippet)}</span>`;
+    btn.addEventListener("click", () => goToSearchResult(result));
+    li.appendChild(btn);
+    searchResults.appendChild(li);
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function goToSearchResult(result) {
+  await command({ type: "go_to", spine_index: result.spine_index });
+}
+
+searchBtn.addEventListener("click", performSearch);
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") performSearch();
 });
 
 const books = await api("/api/books");
