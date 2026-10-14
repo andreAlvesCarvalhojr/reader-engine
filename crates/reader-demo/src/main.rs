@@ -383,7 +383,7 @@ async fn main() {
         .route("/api/command", post(command))
         .route("/api/content", get(content))
         .route("/api/resource", get(resource))
-        .route("/book/{*href}", get(book_resource))
+        .route("/book/*href", get(book_resource))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
