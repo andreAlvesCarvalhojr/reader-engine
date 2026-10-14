@@ -41,6 +41,13 @@ pub struct SavedPosition {
     pub progression: f32,
 }
 
+/// Info about a publication resource for resource listing.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ResourceInfo {
+    pub href: String,
+    pub media_type: String,
+}
+
 /// Snapshot do estado para a UI observar.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct ReaderSnapshot {
@@ -223,6 +230,36 @@ impl FfiReaderSession {
         }));
         snapshot_of(&g)
     }
+
+    /// Read a resource from the publication by its href.
+    /// Use this to serve images, stylesheets, fonts, etc. to WebView.
+    pub fn read_resource(&self, href: String) -> Result<Vec<u8>, ReaderFfiError> {
+        let g = self.inner.lock().expect("session lock");
+        Ok(g.publication().read(&href)?)
+    }
+
+    /// List all resources in the publication with their media types.
+    pub fn list_resources(&self) -> Vec<ResourceInfo> {
+        let g = self.inner.lock().expect("session lock");
+        g.publication()
+            .resources
+            .iter()
+            .map(|r| ResourceInfo {
+                href: r.href.clone(),
+                media_type: r.media_type.clone(),
+            })
+            .collect()
+    }
+
+    /// Get the media type for a resource href, if known.
+    pub fn resource_media_type(&self, href: String) -> Option<String> {
+        let g = self.inner.lock().expect("session lock");
+        g.publication()
+            .resources
+            .iter()
+            .find(|r| r.href == href)
+            .map(|r| r.media_type.clone())
+    }
 }
 
 #[cfg(test)]
@@ -317,5 +354,53 @@ mod tests {
 
         let snap = session2.restore_position(saved_pos);
         assert_eq!(snap.spine_index, 2);
+    }
+
+    #[test]
+    fn list_resources_returns_publication_resources() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-epub/tests/fixtures/sample.epub").to_vec();
+        let session = engine.open("sample.epub".into(), bytes).expect("open epub");
+        let resources = session.list_resources();
+        assert!(!resources.is_empty());
+        assert!(resources.iter().any(|r| r.href.ends_with(".xhtml")));
+    }
+
+    #[test]
+    fn read_resource_returns_bytes() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-epub/tests/fixtures/sample.epub").to_vec();
+        let session = engine.open("sample.epub".into(), bytes).expect("open epub");
+        let resources = session.list_resources();
+        let first = resources.first().expect("at least one resource");
+        let content = session
+            .read_resource(first.href.clone())
+            .expect("read resource");
+        assert!(!content.is_empty());
+    }
+
+    #[test]
+    fn resource_media_type_returns_correct_type() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-epub/tests/fixtures/sample.epub").to_vec();
+        let session = engine.open("sample.epub".into(), bytes).expect("open epub");
+        let resources = session.list_resources();
+        let xhtml_resource = resources
+            .iter()
+            .find(|r| r.href.ends_with(".xhtml"))
+            .expect("xhtml resource");
+        let media_type = session
+            .resource_media_type(xhtml_resource.href.clone())
+            .expect("media type for xhtml");
+        assert!(media_type.contains("xhtml") || media_type.contains("html"));
+    }
+
+    #[test]
+    fn read_nonexistent_resource_returns_error() {
+        let engine = ReaderEngine::new();
+        let bytes = include_bytes!("../../reader-epub/tests/fixtures/sample.epub").to_vec();
+        let session = engine.open("sample.epub".into(), bytes).expect("open epub");
+        let result = session.read_resource("nonexistent.png".into());
+        assert!(result.is_err());
     }
 }
