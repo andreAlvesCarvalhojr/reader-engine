@@ -1,0 +1,23 @@
+{
+  "format": "reader-json",
+  "title": "Noite Clara",
+  "authors": ["Marina Costa"],
+  "language": "pt-BR",
+  "pages": [
+    {
+      "id": "p1",
+      "title": "Abertura",
+      "html": "<article><h1>Noite Clara</h1><p>A cidade respirava em azul-petróleo. Marina atravessou a ponte com o livro ainda fechado sob o braço — não por pressa, mas porque o silêncio merecia a primeira página.</p><p>Este demo usa o parser <strong>reader-json</strong> do engine: bytes entram, <em>Publication</em> e sessão saem.</p></article>"
+    },
+    {
+      "id": "p2",
+      "title": "A ponte",
+      "html": "<article><h2>A ponte</h2><p>Cada poste acendia um pedaço novo do rio. Ela contava os vãos como capítulos: um, dois, três — e no quarto já sabia que voltaria.</p><p>Use <kbd>Anterior</kbd> e <kbd>Próxima</kbd> na barra inferior; o estado vem de <code>ReaderSession</code>.</p></article>"
+    },
+    {
+      "id": "p3",
+      "title": "Fecho",
+      "html": "<article><h2>Fecho</h2><p>Quando a última luz piscou, o livro finalmente abriu sozinho na memória. O motor de leitura só precisava de um locator e de um tema.</p><p>Troque o tema ou a escala tipográfica — o CSS do conteúdo é gerado por <code>ThemeTokens::to_content_css</code>.</p></article>"
+    }
+  ]
+}
