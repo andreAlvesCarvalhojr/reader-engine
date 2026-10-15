@@ -1,0 +1,143 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.github.andreAlvesCarvalhojr",
+    "module": "reader-engine",
+    "version": "0.1.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.1.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "net.java.dev.jna",
+          "module": "jna",
+          "version": {
+            "requires": "5.15.0"
+          },
+          "excludes": [
+            {
+              "group": "*",
+              "module": "*"
+            }
+          ],
+          "thirdPartyCompatibility": {
+            "artifactSelector": {
+              "name": "jna",
+              "type": "aar",
+              "extension": "aar"
+            }
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "reader-engine-0.1.0.aar",
+          "url": "reader-engine-0.1.0.aar",
+          "size": 1811460,
+          "sha512": "cab10af09c8495db78259b5e2e09c354cf36ef1cf648cabacfad1efeccad2fe94e5f029ed5bd5521fac3d62ea1ad76f059bf6805186a17aa00f089bb2c4f38b6",
+          "sha256": "824203bfdf7a0f2696bf64f024c24f09eae4754b102ca0315744d40467fe1bad",
+          "sha1": "e797fea00ede707d9c541d35723a94dd65cbc100",
+          "md5": "c58126883e15b38291ac564177af8797"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.annotation",
+          "module": "annotation",
+          "version": {
+            "requires": "1.9.1"
+          }
+        },
+        {
+          "group": "net.java.dev.jna",
+          "module": "jna",
+          "version": {
+            "requires": "5.15.0"
+          },
+          "excludes": [
+            {
+              "group": "*",
+              "module": "*"
+            }
+          ],
+          "thirdPartyCompatibility": {
+            "artifactSelector": {
+              "name": "jna",
+              "type": "aar",
+              "extension": "aar"
+            }
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "reader-engine-0.1.0.aar",
+          "url": "reader-engine-0.1.0.aar",
+          "size": 1811460,
+          "sha512": "cab10af09c8495db78259b5e2e09c354cf36ef1cf648cabacfad1efeccad2fe94e5f029ed5bd5521fac3d62ea1ad76f059bf6805186a17aa00f089bb2c4f38b6",
+          "sha256": "824203bfdf7a0f2696bf64f024c24f09eae4754b102ca0315744d40467fe1bad",
+          "sha1": "e797fea00ede707d9c541d35723a94dd65cbc100",
+          "md5": "c58126883e15b38291ac564177af8797"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "reader-engine-0.1.0-sources.jar",
+          "url": "reader-engine-0.1.0-sources.jar",
+          "size": 17730,
+          "sha512": "492dadcb7649d060c7b454e71a98e13d3ece54af817af3dc6f1320decbe5a47738b638fc5d13c970020ae1f7b711d2617a8c88e75a0bdf75eb0b1cdcf29dbb66",
+          "sha256": "0d44949bdee933fd0afdbac274a4e08041393db3b7a5c36e0d78c3608917bc06",
+          "sha1": "e20a95fe96147cf57783e0e5271132bfd0ff9ae5",
+          "md5": "39fed987f3d511499d10e7049c3a7d54"
+        }
+      ]
+    }
+  ]
+}
