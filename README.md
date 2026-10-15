@@ -13,8 +13,9 @@ crates/
   reader-wasm   wasm-bindgen — leitor web estático
 themes/         tokens: material3 | hig | fluent
 platforms/
-  android/      Compose + WebView (amostras + picker de arquivo)
-  web/          UI estática + WASM (sem servidor de app)
+  android/      :reader-engine (AAR library) + demo app
+  ios/          Swift Package + XCFramework
+  web/          UI estática + WASM
 ```
 
 ## Desenvolvimento
@@ -25,17 +26,31 @@ cargo run -p reader-demo
 # abre http://127.0.0.1:8787
 ```
 
-### Android (FFI + WebView)
-
-A engine **não abre arquivos sozinha**. O app lê bytes (asset ou picker) e chama `ReaderEngine.open(name, bytes)`.
+### Android library (AAR)
 
 ```bash
-./scripts/generate-kotlin-bindings.sh   # regenera Kotlin
-./scripts/android-build-rust.sh         # precisa NDK → jniLibs/*.so
-# depois abra platforms/android no Android Studio
+./scripts/android-build-rust.sh
+cd platforms/android
+./gradlew :reader-engine:assembleRelease
+```
+
+Consumo em outro app (GitHub Packages, após tag `vX.Y.Z`):
+
+```kotlin
+implementation("com.github.andreAlvesCarvalhojr:reader-engine:0.1.0")
 ```
 
 Detalhes: [`platforms/android/README.md`](platforms/android/README.md).
+
+### iOS (Swift Package)
+
+```bash
+# macOS + Xcode
+./scripts/ios-build-xcframework.sh
+# abra platforms/ios no Xcode como pacote local
+```
+
+Detalhes: [`platforms/ios/README.md`](platforms/ios/README.md).
 
 ### Web estática (WASM)
 
@@ -45,7 +60,7 @@ python3 -m http.server 8788 --directory platforms/web
 # http://127.0.0.1:8788
 ```
 
-Requer `wasm-pack` e target `wasm32-unknown-unknown`. Detalhes: [`platforms/web/README.md`](platforms/web/README.md).
+Detalhes: [`platforms/web/README.md`](platforms/web/README.md).
 
 Requer Rust 1.85+ (`rust-toolchain.toml`).
 
@@ -58,7 +73,16 @@ reg.register(Box::new(EpubParser)).register(Box::new(MyParser));
 let publication = reg.open(Source { name: "livro.xyz".into(), bytes })?;
 ```
 
+## Publicação mobile
+
+Push de tag `v*`:
+
+- AAR → GitHub Packages + asset no Release
+- XCFramework zip → asset no Release (job macOS)
+
+Workflow: `.github/workflows/publish-mobile.yml`.
+
 ## Próximos passos
-1. iOS (SwiftUI + WebView) reutilizando `reader-ffi`.
-2. Empacotar `platforms/web` (PWA / CDN) a partir do `pkg/` gerado.
+1. App demo iOS (SwiftUI + WKWebView) usando o pacote.
+2. Empacotar `platforms/web` (PWA / CDN).
 3. Mais fixtures e ContentHost compartilhado.

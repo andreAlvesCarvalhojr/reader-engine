@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ReaderEngine"
+include(":reader-engine")
 include(":app")
