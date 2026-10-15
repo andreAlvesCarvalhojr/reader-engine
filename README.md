@@ -22,9 +22,11 @@ platforms/
 
 ## Como usar — Android
 
-### 1. Adicione o repositório Maven (GitHub Packages)
+**Sem token / PAT / GITHUB_ACTOR.** O desenvolvedor só adiciona o repositório Maven e o `implementation`.
 
-Em `settings.gradle.kts` (ou `settings.gradle`):
+### 1. Repositório Maven (público)
+
+Em `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -32,23 +34,10 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven {
-            url = uri("https://maven.pkg.github.com/andreAlvesCarvalhojr/reader-engine")
-            credentials {
-                username = providers.gradleProperty("gpr.user").orNull
-                    ?: System.getenv("GITHUB_ACTOR")
-                password = providers.gradleProperty("gpr.key").orNull
-                    ?: System.getenv("GITHUB_TOKEN")
-            }
+            url = uri("https://reader-engine-maven.vercel.app/")
         }
     }
 }
-```
-
-Crie um [PAT](https://github.com/settings/tokens) com scope `read:packages` e coloque no `~/.gradle/gradle.properties`:
-
-```properties
-gpr.user=SEU_USUARIO_GITHUB
-gpr.key=SEU_PAT
 ```
 
 ### 2. Dependência
@@ -61,11 +50,12 @@ dependencies {
 }
 ```
 
-### 3. Alternativa sem Packages — AAR do Release
+Sync Gradle — pronto. Nada de `gradle.properties` com credenciais.
 
-1. Baixe [`reader-engine-release.aar`](https://github.com/andreAlvesCarvalhojr/reader-engine/releases/download/v0.1.0/reader-engine-release.aar)
-2. Coloque em `app/libs/`
-3. Dependências:
+### 3. Alternativa — AAR local
+
+1. Baixe o AAR do Release (ou do Maven acima) e coloque em `app/libs/`
+2. Dependências:
 
 ```kotlin
 dependencies {
@@ -85,7 +75,6 @@ fun openBook(webView: WebView, fileName: String, bytes: ByteArray) {
     val html = session.currentHtml()
     webView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
 
-    // Navegação
     // session.next() / session.prev() / session.goTo(index)
     // session.setFontScale(1.2f)
     // session.setThemeJson(themeJson)
@@ -232,7 +221,11 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-O workflow `publish-mobile.yml` gera AAR (GitHub Packages + Release) e XCFramework (Release).
+O workflow `publish-mobile.yml`:
+
+- AAR → layout Maven em **`mvn-repo`** + deploy público em [reader-engine-maven.vercel.app](https://reader-engine-maven.vercel.app/) (consumo Gradle sem login)
+- AAR + XCFramework → assets no GitHub Release
+- GitHub Packages fica como espelho opcional (não é necessário para apps consumidores)
 
 ---
 
