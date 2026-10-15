@@ -66,14 +66,50 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
 
-      - name: Assemble release AAR
+      - name: Checkout existing public Maven repo
+        if: github.ref_type == 'tag'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: mvn-repo
+          path: platforms/android/public-maven
+
+      - name: Publish to public Maven layout
         working-directory: platforms/android
         env:
           VERSION_NAME: ${{ steps.ver.outputs.name }}
-        run: ./gradlew :reader-engine:assembleRelease --no-daemon
+        run: |
+          mkdir -p public-maven
+          # Drop git metadata from the previous checkout so we republish a clean tree
+          rm -rf public-maven/.git
+          ./gradlew :reader-engine:publishReleasePublicationToPublicMavenRepository --no-daemon
 
-      - name: Publish to GitHub Packages
+      - name: Publish public Maven repo branch
         if: github.ref_type == 'tag'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: platforms/android/public-maven
+          publish_branch: mvn-repo
+          keep_files: true
+          force_orphan: false
+          commit_message: "maven: publish reader-engine ${{ steps.ver.outputs.name }}"
+
+      - name: Deploy public Maven host (Vercel)
+        if: github.ref_type == 'tag'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERSION_NAME: ${{ steps.ver.outputs.name }}
+        run: |
+          if [[ -z "${VERCEL_TOKEN}" ]]; then
+            echo "Skipping Vercel deploy (set secret VERCEL_TOKEN to enable)."
+            exit 0
+          fi
+          ./scripts/deploy-public-maven-vercel.sh
+
+      - name: Publish to GitHub Packages (optional)
+        if: github.ref_type == 'tag'
+        continue-on-error: true
         working-directory: platforms/android
         env:
           VERSION_NAME: ${{ steps.ver.outputs.name }}
@@ -86,6 +122,13 @@ jobs:
         with:
           name: reader-engine-aar
           path: platforms/android/reader-engine/build/outputs/aar/*.aar
+          if-no-files-found: error
+
+      - name: Upload public-maven layout
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-maven
+          path: platforms/android/public-maven
           if-no-files-found: error
 
   ios-xcframework:

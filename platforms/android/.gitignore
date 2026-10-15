@@ -7,6 +7,7 @@ app/build/
 reader-engine/build/
 reader-engine/src/main/jniLibs/**/*.so
 app/src/main/jniLibs/**/*.so
+public-maven/
 captures/
 .cxx/
 

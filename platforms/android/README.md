@@ -9,9 +9,9 @@ Dois módulos Gradle:
 
 A engine **não lê disco**: o app obtém bytes e chama `ReaderEngine.open(name, bytes)`.
 
-## Consumir a library em outro projeto
+## Consumir em outro projeto (sem token)
 
-### Opção A — GitHub Packages (após tag `vX.Y.Z`)
+### 1. Repositório Maven público
 
 ```kotlin
 // settings.gradle.kts
@@ -20,28 +20,24 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven {
-            url = uri("https://maven.pkg.github.com/andreAlvesCarvalhojr/reader-engine")
-            credentials {
-                username = providers.gradleProperty("gpr.user").orNull
-                    ?: System.getenv("GITHUB_ACTOR")
-                password = providers.gradleProperty("gpr.key").orNull
-                    ?: System.getenv("GITHUB_TOKEN")
-            }
+            url = uri("https://reader-engine-maven.vercel.app/")
         }
     }
 }
+```
 
+### 2. Dependência
+
+```kotlin
 // app/build.gradle.kts
 dependencies {
     implementation("com.github.andreAlvesCarvalhojr:reader-engine:0.1.0")
 }
 ```
 
-Crie um PAT com `read:packages` (ou use `GITHUB_TOKEN` em Actions).
+Não precisa de `GITHUB_TOKEN`, PAT nem `GITHUB_ACTOR`. Sync Gradle e use a API.
 
-### Opção B — AAR do GitHub Release
-
-Baixe [`reader-engine-release.aar`](https://github.com/andreAlvesCarvalhojr/reader-engine/releases/download/v0.1.0/reader-engine-release.aar) (Release [v0.1.0](https://github.com/andreAlvesCarvalhojr/reader-engine/releases/tag/v0.1.0)) e:
+### Alternativa — AAR local
 
 ```kotlin
 dependencies {
@@ -89,17 +85,18 @@ cd platforms/android
 ./gradlew :reader-engine:assembleRelease :app:assembleDebug
 ```
 
-### Amostras locais (gitignored)
+### Publicar layout Maven (consumo sem token)
 
 ```bash
-python3 scripts/convert-lessons-pt.py ~/Desktop/lesson-json/arquivo.json
-./scripts/install-local-sample.sh
+VERSION_NAME=0.1.0 ./scripts/publish-public-maven.sh
+# Opcional: PUSH_MVN_REPO=1 VERSION_NAME=0.1.0 ./scripts/publish-public-maven.sh
+# Deploy CDN: ./scripts/deploy-public-maven-vercel.sh
 ```
 
-## Publicar
+## Publicar release
 
 Tag `v0.1.0` dispara `.github/workflows/publish-mobile.yml`:
 
 1. Build NDK + AAR
-2. Publish no GitHub Packages
-3. Build XCFramework (macOS) e anexa AAR + zip iOS no Release
+2. Publica na branch **`mvn-repo`** e no host público Maven
+3. Anexa AAR + XCFramework no GitHub Release
