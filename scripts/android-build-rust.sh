@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila reader-ffi para ABIs Android e gera bindings Kotlin.
+# Compila reader-ffi para ABIs Android e gera bindings Kotlin no módulo library.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,6 +7,7 @@ cd "$ROOT"
 
 ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 TARGETS=("aarch64-linux-android" "armv7-linux-androideabi" "x86_64-linux-android")
+JNI_ROOT="${ROOT}/platforms/android/reader-engine/src/main/jniLibs"
 
 if ! command -v cargo >/dev/null; then
   echo "cargo não encontrado. Instale Rust: https://rustup.rs" >&2
@@ -61,7 +62,7 @@ for i in "${!TARGETS[@]}"; do
   echo "==> building ${target} (${abi})"
   cargo build -p reader-ffi --release --target "${target}"
 
-  out_dir="${ROOT}/platforms/android/app/src/main/jniLibs/${abi}"
+  out_dir="${JNI_ROOT}/${abi}"
   mkdir -p "${out_dir}"
   cp "${ROOT}/target/${target}/release/libreader_ffi.so" "${out_dir}/libreader_ffi.so"
 done
@@ -69,4 +70,4 @@ done
 echo "==> generating Kotlin bindings"
 "${ROOT}/scripts/generate-kotlin-bindings.sh"
 
-echo "OK: jniLibs + bindings atualizados."
+echo "OK: jniLibs em platforms/android/reader-engine/src/main/jniLibs + bindings atualizados."

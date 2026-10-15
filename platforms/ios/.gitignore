@@ -1,0 +1,4 @@
+/build/
+Sources/ReaderFfi/*.swift
+!Sources/ReaderFfi/README.swift
+.DS_Store

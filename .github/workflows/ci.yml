@@ -108,11 +108,11 @@ jobs:
 
       - name: Verify Kotlin bindings are up-to-date
         run: |
-          if ! git diff --exit-code platforms/android/app/src/main/java/uniffi/reader_ffi/; then
+          if ! git diff --exit-code platforms/android/reader-engine/src/main/java/uniffi/reader_ffi/; then
             echo "::error::Kotlin bindings are out of date. Run ./scripts/generate-kotlin-bindings.sh and commit the changes."
             exit 1
           fi
 
-      - name: Build Android app
+      - name: Build Android library AAR + demo app
         working-directory: platforms/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew :reader-engine:assembleRelease :app:assembleDebug --no-daemon
