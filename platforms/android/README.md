@@ -41,7 +41,7 @@ Crie um PAT com `read:packages` (ou use `GITHUB_TOKEN` em Actions).
 
 ### Opção B — AAR do GitHub Release
 
-Baixe `reader-engine-release.aar` do Release e:
+Baixe [`reader-engine-release.aar`](https://github.com/andreAlvesCarvalhojr/reader-engine/releases/download/v0.1.0/reader-engine-release.aar) (Release [v0.1.0](https://github.com/andreAlvesCarvalhojr/reader-engine/releases/tag/v0.1.0)) e:
 
 ```kotlin
 dependencies {

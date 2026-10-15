@@ -29,18 +29,18 @@ let html = try session.currentHtml()
 // carregue `html` em WKWebView
 ```
 
-## Publicação via GitHub Release
+## Consumo via GitHub Release (v0.1.0)
 
-1. Rode `./scripts/ios-build-xcframework.sh` no Mac (ou job `macos` no CI).
-2. Anexe `ReaderFfiFFI.xcframework.zip` ao Release `vX.Y.Z`.
-3. Atualize `Package.swift` para:
+Assets: https://github.com/andreAlvesCarvalhojr/reader-engine/releases/tag/v0.1.0
+
+Para apontar o `binaryTarget` ao zip publicado, troque o path local em `Package.swift` por:
 
 ```swift
 .binaryTarget(
     name: "ReaderFfiFFI",
-    url: "https://github.com/andreAlvesCarvalhojr/reader-engine/releases/download/vX.Y.Z/ReaderFfiFFI.xcframework.zip",
-    checksum: "<checksum impresso pelo script>"
+    url: "https://github.com/andreAlvesCarvalhojr/reader-engine/releases/download/v0.1.0/ReaderFfiFFI.xcframework.zip",
+    checksum: "b02f22ed40f9766c2907573b5da3a8b31a00271a03d6685ab0cea37ae8d7b3c1"
 )
 ```
 
-Consumidores adicionam o pacote pela URL do repositório.
+Em releases novas, rode `./scripts/ios-build-xcframework.sh` (ou use o asset/checksum do Release) e atualize `url` + `checksum`.
