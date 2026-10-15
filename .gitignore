@@ -7,3 +7,6 @@ Cargo.lock.bak
 
 # Local test fixtures (do not commit large/user data)
 fixtures/local/
+
+# wasm-pack output for platforms/web
+platforms/web/pkg/

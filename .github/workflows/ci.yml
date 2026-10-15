@@ -63,6 +63,14 @@ jobs:
             --config crates/reader-ffi/uniffi.toml \
             --no-format
 
+      - name: Install wasm-pack
+        if: runner.os == 'Linux'
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build reader-wasm (web)
+        if: runner.os == 'Linux'
+        run: ./scripts/build-web.sh
+
   android:
     name: Android build
     runs-on: ubuntu-latest
